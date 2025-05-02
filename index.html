@@ -1,11 +1,658 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>tom velle</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+  <link rel="STYLESHEET" type="text/css" href="./css/myspace.css">
+  <title>tom velle</title>
+  <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/focus-visible@5,npm/html-midi-player@1.4.0"></script>
+
 </head>
-<body>
-    h..e..lll....ooo
+<body alink="4e607b" link="4e607b" vlink="4e607b" bottommargin="0" leftmargin="0" rightmargin="0" topmargin="0">
+
+  <!-- Top Navigation Bar -->
+  <div align="center">
+    <table width="800" border="0" align="center" cellpadding="5" cellspacing="0" bgcolor="003399">
+      <form action="#" method="post"></form>
+      <tbody>
+        <tr>
+          <td>
+            <a class="navbar" href="#">
+              <font color="FFFFFF">MySpace.com</font>
+            </a>&nbsp;|&nbsp;
+            <a class="navbar" href="#">
+              <font color="FFFFFF">Home</font>
+            </a>
+          </td>
+          <td align="left">
+            <font color="FFFFFF">
+              The Web <input type="radio" name="searchtype" value="web" checked> MySpace 
+              <input type="radio" name="searchtype" value="myspace">
+              <input style="font-family: Verdana, Geneva, Arial, Helvetica, sans-serif; font-size: 10px;" name="searchrequest" type="text" size="25" maxlength="75">
+              &nbsp;&nbsp;&nbsp;<input type="submit" value="Search" style="font-family: Verdana, Geneva, Arial, Helvetica, sans-serif; font-size: 10px; background-color:E0FFFF;">
+            </font>
+          </td>
+          <td align="right">
+            <a class="man" href="#">
+              <font color="FFFFFF">Help</font>
+            </a>
+            <font color="FFFFFF" size="1">|</font>&nbsp;
+            <a class="man" href="#">
+              <font color="FFFFFF">SignUp</font>
+            </a>&nbsp;
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Secondary Navigation Bar -->
+  <div align="center">
+    <table border="0" cellspacing="0" cellpadding="0" width="800">
+      <tbody>
+        <tr>
+          <td width="800" height="26" bgcolor="6698CB">
+            <table width="800" height="26" border="0" cellspacing="0" cellpadding="0">
+              <tbody>
+                <tr valign="middle">
+                  <td align="center">
+                    <font face="Arial, Helvetica, sans-serif" color="#000000">
+                      <a class="navbar" href="#">Home</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Browse</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Search</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Invite</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Rank</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Mail</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Blog</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Favorites</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Forum</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Groups</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Events</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Games</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Music</a>&nbsp;|&nbsp;
+                      <a class="navbar" href="#">Classifieds</a>
+                    </font>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Main Content Table -->
+  <table width="800" border="0" cellspacing="0" cellpadding="0" align="center">
+    <tbody>
+      <tr>
+        <td width="20" bgcolor="FFFFFF"></td>
+        <td width="780" align="center" bgcolor="FFFFFF">
+          <!-- This table creates two columns: left column for profile details and right column for extended network, blog, friend space, and comments -->
+          <table cellspacing="0" cellpadding="0" border="0">
+            <tbody>
+              <tr>
+                <!-- Left Column -->
+                <td width="275" valign="top" bgcolor="FFFFFF">
+                  <br>
+                  <!-- Profile Header -->
+                  <table border="0" cellspacing="0" cellpadding="0" width="300" height="100">
+                    <tbody>
+                      <tr>
+                        <td width="300" bgcolor="FFFFFF" class="text" colspan="3" align="left" valign="bottom" style="word-wrap:break-word">
+                          <span class="nametext">tom velle</span><br><br>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table cellpadding="0" cellspacing="0" width="300" align="center">
+                            <tbody>
+                              <tr>
+                                <td width="75" height="75" bgcolor="#ffffff" class="text">
+                                  <a href="#">
+                                    <img src="./images/4.png" border="0" width="150">
+                                  </a>
+                                </td>
+                                <td width="15" height="75" bgcolor="#ffffff"></td>
+                                <td width="193" height="75" bgcolor="#ffffff" class="text">
+                                  <div>"I kinda do everything..."</div>
+                                  <br>
+                                  <div>Male</div>
+                                  <div>37</div>
+                                  <div>Cincinnati, Ohio</div>
+                                  <div>United States</div>
+                                </td>
+                              </tr>
+                              <tr align="center" valign="middle">
+                                <td>
+                                  <a href="#">View more pics</a>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <!-- Contact Table -->
+                  <table class="contactTable" border="1" cellspacing="0" cellpadding="0" width="300" bordercolor="#6699cc">
+                    <tbody>
+                      <tr>
+                        <td width="300" height="15" bgcolor="#6699cc" class="text" align="left" style="word-wrap:break-word">
+                          &nbsp;&nbsp;&nbsp;<span>Contact tom</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table border="0" cellspacing="0" cellpadding="0" width="300" bordercolor="#000000">
+                            <tbody>
+                              <tr>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td width="120" height="5" nowrap bgcolor="#ffffff" align="center" class="text">
+                                  <a href="#"><img src="./images/sendMailIcon.gif" border="0" align="middle"></a>
+                                </td>
+                                <td width="15" height="5" bgcolor="#ffffff"></td>
+                                <td width="150" nowrap height="5" bgcolor="#ffffff" align="center" class="text" valign="top">
+                                  <a href="#"><img src="./images/forwardMailIcon.gif" border="0" align="middle"></a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colspan="3"></td>
+                              </tr>
+                              <tr>
+                                <td width="130" nowrap height="5" bgcolor="#ffffff" align="center" class="text" valign="top">
+                                  <a href="#"><img src="./images/addFriendIcon.gif" border="0" align="middle"></a>
+                                </td>
+                                <td width="15" height="5" bgcolor="#ffffff"></td>
+                                <td width="150" nowrap height="2" bgcolor="#ffffff" align="center" class="text" valign="middle">
+                                  <a href="#"><img src="./images/addFavoritesIcon.gif" border="0" align="middle"></a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colspan="3"></td>
+                              </tr>
+                              <tr>
+                                <td width="130" nowrap height="5" bgcolor="#ffffff" align="center" class="text" valign="top">
+                                  <a href="#"><img src="./images/messagefriend.gif" border="0" align="middle"></a>
+                                </td>
+                                <td width="15" height="5" bgcolor="#ffffff"></td>
+                                <td width="150" nowrap height="5" bgcolor="#ffffff" align="center" class="text" valign="top">
+                                  <a href="#" onclick="return confirm('Are you sure you want to block this user?');">
+                                    <img src="./images/blockuser.gif" border="0" align="middle">
+                                  </a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td width="130" nowrap height="5" bgcolor="#ffffff" align="center" class="text" valign="top">
+                                  <a href="#"><img src="./images/icon_add_to_group.gif" border="0" align="middle"></a>
+                                </td>
+                                <td width="15" height="5" bgcolor="#ffffff"></td>
+                                <td width="150" nowrap height="2" bgcolor="#ffffff" align="center" class="text" valign="middle">
+                                  <a href="#"><img src="./images/icon_rank_user4.gif" border="0" align="middle"></a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <br>
+
+                  <!-- Music Player -->
+                  <div id="musicPlayer" style="display: block; height: 53px; width: 300px; background-image: url('img/playersmallpaused.gif');">
+					<midi-player src="https://bitmidi.com/uploads/18243.mid" sound-font>
+				  </midi-player>
+									  <div style="float:left; margin:5px 0 0 11px; font-weight:bold; font-family: Arial, sans-serif; font-size: 12px;">
+                      Feeling This - Blink 182
+					  <br/><br/>
+                    </div>
+                  </div>
+                  <br>
+
+                  <!-- Interests Section -->
+                  <table border="1" cellspacing="0" cellpadding="0" width="300" bgcolor="6699cc">
+                    <tbody>
+                      <tr>
+                        <td class="text" valign="center" align="left" width="300" bgcolor="6699cc" height="10" style="word-wrap:break-word">
+                          &nbsp;&nbsp;&nbsp;<span class="whitetext12">tom's Interests</span>
+                        </td>
+                      </tr>
+                      <tr valign="top">
+                        <td>
+                          <table border="1" cellspacing="3" cellpadding="3" width="300" align="center" bgcolor="ffffff" style="border: none;">
+                            <tbody>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">General</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+									Building worlds out of code and chaos, filming squirrels and stories, writing songs from memory, reliving 2005 energy, and putting the weird parts of the internet to good use.
+                                </td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Music</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+									Pop-punk, Emo, Trap with feelings, Mod Sun, MGK, Blink-182, Mest, Alkaline Trio, lo-fi nostalgia, acoustic heartbreak, and high-energy covers of sad songs.
+                                </td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Movies</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+									any movie that could be described as "a guy who's not okay but trying."
+                                </td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Television</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+									Doctor Who, 24, King of the Hill, Yellowjackets
+                                </td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Video Games</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+									EarthBound, Pokemon Go, Fallout, World of Warcraft
+                                </td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Books</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+                                  lol books
+                                </td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Groups:</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">
+									Looking to start a new Top 8-era revolution. Who's in? Bring your squirrels, your side projects, your weird nostalgia energy.
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <!-- Details Section -->
+                  <table border="1" cellspacing="0" cellpadding="0" width="300" bgcolor="6699cc">
+                    <tbody>
+                      <tr>
+                        <td class="text" valign="center" align="left" width="300" bgcolor="6699cc" height="10" style="word-wrap:break-word">
+                          &nbsp;&nbsp;&nbsp;<span class="whitetext12">tom's Details</span>
+                        </td>
+                      </tr>
+                      <tr valign="top">
+                        <td>
+                          <table border="1" cellspacing="3" cellpadding="3" width="300" align="center" bgcolor="ffffff" style="border: none;">
+                            <tbody>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Status:</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">Married (and very grateful about it)</td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Here for:</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">Reclaiming old vibes, making new stuff, bringing your inner emo kid back online.
+								</td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Hometown</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">Warped Tour</td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Zodiac Sign</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">Cancer</td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Smoke / Drink</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">Smoke what? / Yes</td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Education</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">Xavier University - Computer Science 2009</td>
+                              </tr>
+                              <tr>
+                                <td valign="top" align="left" width="100" bgcolor="b1d0f0">
+                                  <span class="lightbluetext8">Occupation</span>
+                                </td>
+                                <td style="word-wrap:break-word" width="175" bgcolor="d5e8fb">TBD</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <!-- Schools Section -->
+                  <div id="schoolsSection">
+                    <table border="1" cellspacing="0" cellpadding="0" width="300" bgcolor="6699cc">
+                      <tbody>
+                        <tr>
+                          <td class="text" valign="center" align="left" width="300" bgcolor="6699cc" height="10" style="word-wrap:break-word">
+                            &nbsp;&nbsp;&nbsp;<span class="whitetext12">tom's Schools</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <table border="1" cellspacing="3" cellpadding="3" width="300" align="center" style="border: none;">
+                              <tbody>
+                                <tr>
+                                  <td valign="top" align="left" width="240" bgcolor="b1d0f0">
+                                    <a href="#">Indian Hill High School</a>
+                                  </td>
+                                  <td valign="top" align="middle" width="60" bgcolor="d5e8fb">
+                                    Class of 2005
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td valign="top" align="left" width="240" bgcolor="b1d0f0">
+                                    <a href="#">Xavier University</a>
+                                  </td>
+                                  <td valign="top" align="middle" width="60" bgcolor="d5e8fb">
+                                    Class of 2010
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <br>
+                  </div>
+                </td>
+
+                <!-- Right Column -->
+                <td width="15" align="center" valign="top" bgcolor="White"></td>
+                <td width="435" valign="top" bgcolor="White" class="text">
+                  <br>
+                  <!-- Extended Network -->
+                  <table border="1" cellspacing="0" cellpadding="0" width="435">
+                    <tbody>
+                      <tr>
+                        <td align="center" style="word-wrap:break-word" width="435">
+                          <span class="blacktext12">tom is in your extended network</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <!-- Latest Blog Entry -->
+                  <table border="0" cellspacing="3" cellpadding="0" width="435" align="center" bgcolor="ffffff">
+                    <tbody>
+                      <tr>
+                        <td style="word-wrap:break-word" width="435">
+                          <span class="btext">tom's Latest Blog Entry</span> [<a href="#">Subscribe to this Blog</a>]<br><br>
+                        </td>
+                      </tr>
+                      <tr valign="top">
+                        <td style="word-wrap:break-word" width="435">
+                          You'll never guess what I'm working on next...<br><br>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td align="left" bgcolor="ffffff" height="25">
+                          [<a href="#">View All Blog Entries</a>]
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <!-- Friend Space -->
+                  <table border="0" cellspacing="0" cellpadding="0" width="435">
+                    <tbody>
+                      <tr>
+                        <td class="text" align="left" width="435" bgcolor="ffffff" height="20">
+                          <table border="1" height="20" cellspacing="0" cellpadding="0" width="435" bgcolor="ffcc99">
+                            <tbody>
+                              <tr>
+                                <td style="word-wrap:break-word" width="435">
+                                  &nbsp;&nbsp;&nbsp;<span class="orangetext15">tom's Friend Space</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <table border="0" cellspacing="5" cellpadding="5" width="435" align="center">
+                            <tbody>
+                              <tr>
+                                <td bgcolor="ffffff" colspan="4" style="word-wrap:break-word" width="435">
+                                  <span class="btext">tom has <span class="redbtext">1337</span> Friends.</span>
+                                </td>
+                              </tr>
+                              <tr>
+                                <!-- Friend 1 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">Tom</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/tom.jpg" width="90">
+                                  </a>
+                                </td>
+                                <!-- Friend 2 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">Git Velle</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/9.png" width="90">
+                                  </a>
+                                </td>
+                                <!-- Friend 3 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">Take Two Tom</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/8.png" width="90">
+                                  </a>
+                                </td>
+                                <!-- Friend 4 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">Tom the Voice</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/1.png" width="90">
+                                  </a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <!-- Friend 5 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">real tom velle</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/2.png" width="90">
+                                  </a>
+                                </td>
+                                <!-- Friend 6 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">Thomas F.</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/7.png" width="90" alt="">
+                                  </a>
+                                </td>
+                                <!-- Friend 7 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">evol</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/6.png" width="90">
+                                  </a>
+                                </td>
+                                <!-- Friend 8 -->
+                                <td bgcolor="#FFFFFF" align="center" valign="top" width="107" style="word-wrap:break-word">
+                                  <a href="#">Mayor Tom</a>
+                                  <br><br>
+                                  <a href="#">
+                                    <img src="./images/5.png" width="90" alt="">
+                                  </a>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colspan="4" align="right">
+                                  <a href="#" class="redlink">View All of tom's Friends</a>
+                                  <br><br>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <br>
+
+                  <!-- Comments Section -->
+                  <table border="0" cellspacing="0" cellpadding="0" width="435">
+                    <tbody>
+                      <tr>
+                        <td class="text" align="left" width="435" bgcolor="ffffff" height="20">
+                          <table border="1" cellspacing="0" cellpadding="0" width="441" bgcolor="ffcc99">
+                            <tbody>
+                              <tr>
+                                <td style="word-wrap:break-word" width="441">
+                                  <span class="orangetext15">tom's Friends Comments</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                          <div>
+                            <b>
+                              Displaying <span class="redtext">x</span> of <span class="redtext">y</span> comments (<a href="#">View/Edit All Comments</a>)
+                              <table border="1" cellspacing="0" cellpadding="3" width="100%" bordercolor="FFffff">
+                                <tbody>
+                                  <tr>
+                                    <td align="center" valign="top" width="150" bgcolor="FF9933" style="word-wrap:break-word">
+                                      <a href="#">You!</a><br><br>
+                                      <a href="#">
+                                        <img style="max-width:90px; max-height:180px;" src="./images/tom.jpg" border="0">
+                                      </a>
+                                      <br><br><br>
+                                    </td>
+                                    <td bgcolor="F9D6B4" align="left" valign="top" width="260" style="word-wrap:break-word">
+                                      <span class="blacktext10">??????</span><br><br>
+                                      this could be you!
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <table border="1" cellspacing="0" cellpadding="3" width="100%" bordercolor="FFffff">
+                                <tbody>
+                                  <tr>
+                                    <td align="center" valign="top" width="150" bgcolor="FF9933" style="word-wrap:break-word">
+                                      <a href="#">Tom</a><br><br>
+                                      <a href="#">
+                                        <img style="max-width:90px; max-height:180px;" src="./images/tom.jpg" border="0">
+                                      </a>
+                                      <br><br><br>
+                                    </td>
+                                    <td bgcolor="F9D6B4" align="left" valign="top" width="260" style="word-wrap:break-word">
+                                      <span class="blacktext10">4/19/2020 4:20 AM</span><br><br>
+                                      Hey! What the heck?!
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </b>
+                          </div>
+                          <table border="0" cellspacing="3" cellpadding="0" width="435" align="center" bgcolor="ffffff">
+                            <tbody>
+                              <tr>
+                                <td align="right">
+                                  <a href="#">Add Comment</a>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <!-- End Comments Section -->
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Footer -->
+  <table width="100%" border="0" cellspacing="0" cellpadding="0">
+    <tbody>
+      <tr bgcolor="#e5e5e5" valign="top">
+        <td>
+          <div align="center">
+            <div align="center">
+              <b>
+                <font face="Arial, Helvetica, sans-serif">
+                  <font color="#003399" size="1" face="Arial, Helvetica, sans-serif">
+                    <a class="text" href="#" target="_blank"><u>About</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>FAQ</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>Terms</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>Privacy</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>Safety Tips</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>Contact Myspace</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>Promote!</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_blank"><u>Advertise</u></a>&nbsp;|&nbsp;
+                    <a class="text" href="#" target="_new"><u>MySpace Shop</u></a>
+                  </font>
+                </font>
+              </b>
+              <br>
+              <font face="Arial, Helvetica, sans-serif">
+                <font color="#003399" size="1" face="Arial, Helvetica, sans-serif">
+                  <a href="#">
+                    <u>©2003-2005 MySpace.com All Rights Reserved.</u>
+                  </a>
+                </font>
+              </font>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <style type="text/css">
+    body, html { visibility: visible !important; display: block !important; }
+  </style>
+
 </body>
 </html>
