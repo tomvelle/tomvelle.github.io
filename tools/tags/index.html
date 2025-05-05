@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>YouTube Tag Reference - Tom Velle</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1e1e1e;
+      color: #f4f4f4;
+      padding: 2em;
+      max-width: 900px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 2em;
+      text-align: center;
+      margin-bottom: 1em;
+      color: #ff6ec7;
+    }
+    h2, h3 {
+      color: #9cdcfe;
+      margin-top: 2em;
+    }
+    .tag-block {
+      background: #2d2d2d;
+      padding: 1em;
+      border-radius: 8px;
+      margin-top: 0.5em;
+      margin-bottom: 1em;
+      cursor: pointer;
+      border-left: 5px solid #ff6ec7;
+      transition: background 0.2s;
+    }
+    .tag-block:hover {
+      background: #383838;
+    }
+    .note {
+      font-size: 0.9em;
+      color: #aaaaaa;
+      margin-top: -1em;
+      margin-bottom: 2em;
+    }
+    .copied {
+      background: #00c853 !important;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h1>YouTube Tag Reference - Tom Velle</h1>
+
+  <h2>Global Default Tags</h2>
+  <div class="tag-block" onclick="copyTags(this)">
+    tom velle, evolsoulx, nostalgic content, weirdcore, glitchcore, multiverse storytelling, DIY video, indie creator, 2000s nostalgia, experimental media, emotional storytelling, creative tech, surreal edits, alternative reality, internet culture
+  </div>
+
+  <h2>Tag Bundles by Content Type</h2>
+
+  <h3>Tom Velle (Main)</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    tom velle series, indie web show, multiverse content, creative storytelling, full stack creator, character driven, alt internet
+  </div>
+
+  <h3>Shorts Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    youtube shorts, short comedy, fast cuts, absurd clips, bite-sized weirdness, alt shorts, trending humor
+  </div>
+
+  <h3>Music Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    pop punk cover, ai music, mashup edit, nostalgic remix, emo trap, genre blend, diy music video
+  </div>
+
+  <h3>Squirrel Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    squirrelville, funny animals, backyard cam, critter chaos, motion cam edit, squirrels being weird, wildlife stream
+  </div>
+
+  <h3>Puppy Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    puppy content, funny dog, cute pets, rory the dog, pet cam, puppy chaos, backyard pup
+  </div>
+
+  <h3>Tribute Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    fan edit, nostalgia mashup, pop culture tribute, retro remix, emotional homage, crossover cut, media love letter
+  </div>
+
+  <h3>Glitch Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    glitchcore, weirdcore, dreamcore, liminal edit, experimental art, alt aesthetic, internet nostalgia
+  </div>
+
+  <h3>Random Life</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    irl moment, slice of life, daily weirdness, offbeat vlog, candid footage, lo-fi life, personal chaos
+  </div>
+
+  <h3>Deep Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    video essay, metadata breakdown, media theory, internet culture, thoughtful content, storytelling deep dive
+  </div>
+
+  <h3>Dev Velle</h3>
+  <div class="tag-block" onclick="copyTags(this)">
+    creative coding, automation demo, dev content, prompt engineering, visual code, obs workflow, indie tech
+  </div>
+
+  <script>
+    function copyTags(elem) {
+      const text = elem.innerText.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        elem.classList.add('copied');
+        elem.innerText = 'Copied!';
+        setTimeout(() => {
+          elem.classList.remove('copied');
+          elem.innerText = text;
+        }, 1200);
+      });
+    }
+  </script>
+</body>
+</html>
