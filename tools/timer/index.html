@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Timer Overlay Generator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: white;
+      padding: 20px;
+    }
+    canvas {
+      background: transparent;
+      display: block;
+      margin: 20px auto;
+    }
+    input, select, button {
+      margin: 4px;
+      padding: 6px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Timer Overlay Generator</h1>
+
+  <label>Start Time:</label>
+  <input type="number" id="hours" value="0" min="0"> h
+  <input type="number" id="minutes" value="0" min="0"> m
+  <input type="number" id="seconds" value="0" min="0"> s<br>
+
+  <label>Output Length (seconds):</label>
+  <input type="number" id="outputLength" value="10" min="1"><br>
+
+  <label>Count Direction:</label>
+  <select id="direction">
+    <option value="up">Count Up</option>
+    <option value="down">Count Down</option>
+  </select><br>
+
+  <label>Font Presets:</label>
+  <select id="presetFont" onchange="document.getElementById('font').value = this.value">
+    <option value="Arial">Arial</option>
+    <option value="Courier New">Courier New</option>
+    <option value="Impact">Impact</option>
+    <option value="Georgia">Georgia</option>
+    <option value="Verdana">Verdana</option>
+  </select><br>
+
+  <label>Or Custom Font:</label>
+  <input type="text" id="font" value="Arial"><br>
+
+  <label>Font Size (px):</label>
+  <input type="number" id="fontSize" value="100" min="10"><br>
+
+  <label>Text Color:</label>
+  <input type="color" id="fontColor" value="#ffffff"><br>
+
+  <label>Display Format:</label>
+  <select id="format">
+    <option value="hms">HH:MM:SS</option>
+    <option value="ms">MM:SS</option>
+    <option value="s">SS</option>
+  </select><br>
+
+  <button onclick="exportVideo()">Generate & Export</button>
+
+  <canvas id="timerCanvas" width="800" height="200"></canvas>
+
+  <script>
+    const canvas = document.getElementById('timerCanvas');
+    const ctx = canvas.getContext('2d', { alpha: true });
+
+    let recorder, recordedChunks = [];
+
+    function formatTime(seconds, format) {
+      seconds = Math.max(0, Math.floor(seconds));
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+
+      switch (format) {
+        case 'hms':
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        case 'ms':
+          return `${String(m + h * 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        case 's':
+          return String(h * 3600 + m * 60 + s).padStart(2, '0');
+      }
+    }
+
+    function drawTime(text, font, fontSize, fontColor) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = fontColor;
+      ctx.font = `${fontSize}px '${font}'`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    }
+
+    async function exportVideo() {
+      const hrs = parseInt(document.getElementById('hours').value) || 0;
+      const mins = parseInt(document.getElementById('minutes').value) || 0;
+      const secs = parseInt(document.getElementById('seconds').value) || 0;
+      const format = document.getElementById('format').value;
+      const direction = document.getElementById('direction').value;
+      const outputLength = parseInt(document.getElementById('outputLength').value) || 10;
+      const font = document.getElementById('font').value;
+      const fontSize = parseInt(document.getElementById('fontSize').value) || 100;
+      const fontColor = document.getElementById('fontColor').value;
+
+      let startValue = hrs * 3600 + mins * 60 + secs;
+
+      const fps = 60;
+      const totalFrames = outputLength * fps;
+
+      const stream = canvas.captureStream(fps);
+      recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      recordedChunks = [];
+
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'timer.webm';
+        a.click();
+      };
+
+      recorder.start();
+
+      for (let frame = 0; frame < totalFrames; frame++) {
+        const t = frame / fps;
+        let timeValue = direction === 'up' ? startValue + t : startValue - t;
+        drawTime(formatTime(timeValue, format), font, fontSize, fontColor);
+        await new Promise(r => setTimeout(r, 1000 / fps));
+      }
+
+      recorder.stop();
+    }
+  </script>
+</body>
+</html>
