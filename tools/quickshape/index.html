@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Color Swatch Generator</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #444;
+      margin-top: 10px;
+    }
+    input[type="color"] {
+      appearance: none;
+      -webkit-appearance: none;
+      border: none;
+      width: 60px;
+      height: 40px;
+      cursor: pointer;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Color Swatch Generator</h1>
+  <input type="color" id="colorPicker" value="#ff0000">
+  <button onclick="generateSwatch()">Generate</button>
+  <button onclick="exportSwatch()">Export PNG</button>
+  <br>
+  <canvas id="swatchCanvas" width="50" height="50"></canvas>
+
+  <script>
+    const canvas = document.getElementById('swatchCanvas');
+    const ctx = canvas.getContext('2d');
+    const picker = document.getElementById('colorPicker');
+
+    function generateSwatch() {
+      const color = picker.value;
+      ctx.clearRect(0, 0, 50, 50);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, 50, 50);w
+    }
+
+    function exportSwatch() {
+      const hex = picker.value.toLowerCase();
+      const filename = hex + '.png';
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    generateSwatch(); // draw on load
+  </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Submit a Video for Review</title>
+</head>
+<body>
+  <h1>Submit a Video for Review</h1>
+  <form id="submitForm">
+    <input type="url" name="videoURL" placeholder="YouTube Link" required><br>
+    <input type="text" name="submitter" placeholder="Your Name (optional)"><br>
+    <input type="hidden" name="streamer" value="tomvelle">
+    <button type="submit">Submit</button>
+  </form>
+  <p id="result"></p>
+
+  <script>
+    const form = document.getElementById('submitForm');
+    const result = document.getElementById('result');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+
+      const res = await fetch('https://script.google.com/macros/s/AKfycby4MuooJvXvQHE0xWZUDBBdS8YdPv74xB0bK7Eh9KeFh1sQBUTHBKJuMkq6DTxQxYmxTw/exec', {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const resJson = await res.json();
+      result.textContent = resJson.status === 'success'
+        ? "✅ Submitted!"
+        : resJson.status === 'duplicate'
+        ? "⚠️ Already submitted!"
+        : "❌ Error. Try again.";
+    });
+  </script>
+</body>
+</html>
