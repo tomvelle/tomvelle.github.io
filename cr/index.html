@@ -1,33 +1,66 @@
 <!DOCTYPE html>
 <html>
-  <!-- intended to be done entirely from this page, unless css or scripts get too large. idea is front end only. -->
 <head>
   <title>Submit a Video for Review</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 500px; margin: auto; }
+    label { display: block; margin-bottom: 1rem; }
+    input { width: 100%; padding: 0.5rem; }
+    button { padding: 0.5rem 1rem; font-weight: bold; }
+    #result { margin-top: 1rem; font-weight: bold; }
+  </style>
 </head>
 <body>
-<form action="https://docs.google.com/forms/d/e/1FAIpQLSf_sNXjk7OjWsuArB8xtBi3ZMvsIPnAbNqnOwgnYqgKvDOhww/formResponse" method="POST" target="hidden_iframe" onsubmit="submitted=true;">
+
+<h2>Submit a Video for Review</h2>
+
+<form id="submitForm">
   <label>
     link [the video]:<br>
     <input type="text" name="entry.431960744" required>
-  </label><br><br>
+  </label>
   
   <label>
     for [the streamer]:<br>
     <input type="text" name="entry.458153471">
-  </label><br><br>
+  </label>
   
-  <!-- Hidden streamer field -->
-     <label>
+  <label>
     from [the you]:<br>
     <input type="text" name="entry.109801517">
-  </label><br><br>
+  </label>
 
-  
   <button type="submit">Submit</button>
 </form>
 
-<!-- Prevents page reload -->
-<iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+<p id="result"></p>
+
+<script>
+  const form = document.getElementById('submitForm');
+  const result = document.getElementById('result');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+
+    const action = "https://docs.google.com/forms/d/e/1FAIpQLSf_sNXjk7OjWsuArB8xtBi3ZMvsIPnAbNqnOwgnYqgKvDOhww/formResponse";
+
+    try {
+      await fetch(action, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData
+      });
+
+      result.textContent = "✅ Submitted! Your video is in the queue.";
+      form.reset();
+    } catch (err) {
+      console.error("Submission error", err);
+      result.textContent = "❌ Submission failed. Please try again.";
+    }
+  });
+</script>
 
 </body>
 </html>
