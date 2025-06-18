@@ -308,5 +308,36 @@
     generateBarsRandom();
     speedVal.textContent = speedSlider.value;
   </script>
+
+
+<footer style="
+  width: 100vw;
+  background: #20222b;
+  color: #ccc;
+  padding: 28px 0 22px 0;
+  text-align: center;
+  font-size: 1.05rem;
+  letter-spacing: .02em;
+  border-top: 1px solid #333;
+  margin-top: 24px;
+">
+  <div style="margin-bottom: 8px; font-size: 1.12rem;">
+    another <b>tomvelle</b> project
+  </div>
+  <div style="margin-bottom: 10px;">
+    <a href="https://tomvelle.com" target="_blank" rel="noopener" style="color:#36a3d9;text-decoration:none;margin:0 10px;">Portfolio</a>
+    <a href="https://www.youtube.com/@tomvelle" target="_blank" rel="noopener" style="color:#36a3d9;text-decoration:none;margin:0 10px;">YouTube</a>
+    <a href="https://www.tiktok.com/@realtomvelle" target="_blank" rel="noopener" style="color:#36a3d9;text-decoration:none;margin:0 10px;">TikTok</a>
+    <a href="https://www.twitch.tv/squirrelville" target="_blank" rel="noopener" style="color:#36a3d9;text-decoration:none;margin:0 10px;">Squirrelville</a>
+    <a href="https://discord.gg/7Rh9kPBzmg" target="_blank" rel="noopener" style="color:#36a3d9;text-decoration:none;margin:0 10px;">Discord</a>
+  </div>
+  <div style="font-size: .97rem; color: #555; margin-top: 7px;">
+    &copy; <span id="footerYear"></span> tomvelle. probably built to be part of something else, but hey, it's cool right?
+  </div>
+  <script>
+    document.getElementById("footerYear").textContent = new Date().getFullYear();
+  </script>
+</footer>
+
 </body>
 </html>
