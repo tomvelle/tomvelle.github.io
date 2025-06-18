@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sort Animation Playground</title>
+  <style>
+    body {
+      background: #16181c;
+      color: #f2f2f2;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    h1 { margin-top: 32px; font-size: 2rem; font-weight: 700; }
+    #controls {
+      margin: 24px 0;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #sortArea {
+      background: #23242a;
+      width: 900px;
+      height: 380px;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px #000a 0.2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 36px;
+      overflow: hidden;
+      position: relative;
+    }
+    .bar {
+      width: 16px;
+      margin: 0 2px;
+      background: #f2f2f2;
+      border-radius: 5px 5px;
+      transition: height 0.1s, background 0.18s;
+      display: inline-block;
+    }
+    select, button {
+      background: #23242a;
+      color: #f2f2f2;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      transition: background 0.13s;
+    }
+    button:hover, select:hover {
+      background: #333;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 8px;
+    }
+    .slider-container label {
+      font-size: 0.97rem;
+      color: #c5c6ca;
+    }
+    .slider-container input[type="range"] {
+      width: 110px;
+      accent-color: #36a3d9;
+    }
+    .slider-value {
+      width: 30px;
+      display: inline-block;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sort Animation Playground</h1>
+  <div id="controls">
+    <button id="shuffleBtn">Shuffle</button>
+    <button id="ascBtn">Ascending</button>
+    <button id="descBtn">Descending</button>
+    <select id="algoSelect">
+      <option value="bubble">Bubble Sort</option>
+      <option value="selection">Selection Sort</option>
+      <option value="insertion">Insertion Sort</option>
+      <option value="quick">Quick Sort</option>
+    </select>
+    <button id="sortBtn">Sort</button>
+    <div class="slider-container">
+      <label for="speedSlider">Speed</label>
+      <input type="range" min="1" max="60" value="25" id="speedSlider">
+      <span class="slider-value" id="speedVal">25</span>
+    </div>
+  </div>
+  <div id="sortArea"></div>
+
+  <script>
+    const NUM_BARS = 50;
+    const MIN_HEIGHT = 24; // px
+    const MAX_HEIGHT = 340; // px
+
+    const sortArea = document.getElementById('sortArea');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const ascBtn = document.getElementById('ascBtn');
+    const descBtn = document.getElementById('descBtn');
+    const sortBtn = document.getElementById('sortBtn');
+    const algoSelect = document.getElementById('algoSelect');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedVal = document.getElementById('speedVal');
+
+    let bars = [];
+    let sorting = false;
+    let speed = 25; // ms per step (lower is faster)
+
+    speedSlider.oninput = function () {
+      speed = Number(this.value);
+      speedVal.textContent = this.value;
+    };
+
+    // Generate unique heights (always the same, only the order changes)
+    function getHeightsArray() {
+      let arr = [];
+      for (let i = 0; i < NUM_BARS; i++) {
+        arr.push(Math.round(MIN_HEIGHT + i * ((MAX_HEIGHT - MIN_HEIGHT) / (NUM_BARS - 1))));
+      }
+      return arr;
+    }
+
+    // Shuffle helper
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function setBarsFromHeights(heights) {
+      bars = [];
+      sortArea.innerHTML = '';
+      for (let i = 0; i < NUM_BARS; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = heights[i] + 'px';
+        sortArea.appendChild(bar);
+        bars.push({ el: bar, val: heights[i] });
+      }
+    }
+
+    function generateBarsRandom() {
+      setBarsFromHeights(shuffleArray(getHeightsArray()));
+    }
+
+    function generateBarsAscending() {
+      setBarsFromHeights(getHeightsArray().slice());
+    }
+
+    function generateBarsDescending() {
+      setBarsFromHeights(getHeightsArray().slice().reverse());
+    }
+
+    // Visual helpers
+    function swapBars(i, j) {
+      let temp = bars[i].val;
+      bars[i].val = bars[j].val;
+      bars[j].val = temp;
+      bars[i].el.style.height = bars[i].val + 'px';
+      bars[j].el.style.height = bars[j].val + 'px';
+    }
+
+    function setBarColor(idx, color) {
+      bars[idx].el.style.background = color;
+    }
+
+    function resetBarColors() {
+      bars.forEach(bar => bar.el.style.background = '#f2f2f2');
+    }
+
+    // Sorting Algorithms (with speed)
+    async function bubbleSort() {
+      for (let i = 0; i < bars.length; i++) {
+        for (let j = 0; j < bars.length - i - 1; j++) {
+          setBarColor(j, '#36a3d9');
+          setBarColor(j + 1, '#36a3d9');
+          await sleep(speed);
+          if (bars[j].val > bars[j + 1].val) {
+            swapBars(j, j + 1);
+            await sleep(speed);
+          }
+          setBarColor(j, '#f2f2f2');
+          setBarColor(j + 1, '#f2f2f2');
+        }
+      }
+    }
+
+    async function selectionSort() {
+      for (let i = 0; i < bars.length - 1; i++) {
+        let minIdx = i;
+        setBarColor(i, '#a14be4');
+        for (let j = i + 1; j < bars.length; j++) {
+          setBarColor(j, '#f19500');
+          await sleep(speed);
+          if (bars[j].val < bars[minIdx].val) {
+            if (minIdx !== i) setBarColor(minIdx, '#f2f2f2');
+            minIdx = j;
+            setBarColor(minIdx, '#e74c3c');
+          } else {
+            setBarColor(j, '#f2f2f2');
+          }
+        }
+        if (minIdx !== i) {
+          swapBars(i, minIdx);
+          await sleep(speed);
+        }
+        setBarColor(i, '#f2f2f2');
+        setBarColor(minIdx, '#f2f2f2');
+      }
+    }
+
+    async function insertionSort() {
+      for (let i = 1; i < bars.length; i++) {
+        let key = bars[i].val;
+        let j = i - 1;
+        setBarColor(i, '#f19500');
+        while (j >= 0 && bars[j].val > key) {
+          setBarColor(j, '#36a3d9');
+          bars[j + 1].val = bars[j].val;
+          bars[j + 1].el.style.height = bars[j].el.style.height;
+          await sleep(speed);
+          setBarColor(j, '#f2f2f2');
+          j--;
+        }
+        bars[j + 1].val = key;
+        bars[j + 1].el.style.height = key + 'px';
+        setBarColor(i, '#f2f2f2');
+      }
+    }
+
+    async function quickSort(low = 0, high = bars.length - 1) {
+      if (low < high) {
+        let pi = await partition(low, high);
+        await quickSort(low, pi - 1);
+        await quickSort(pi + 1, high);
+      }
+    }
+    async function partition(low, high) {
+      let pivot = bars[high].val;
+      setBarColor(high, '#e74c3c');
+      let i = low - 1;
+      for (let j = low; j < high; j++) {
+        setBarColor(j, '#36a3d9');
+        await sleep(speed);
+        if (bars[j].val < pivot) {
+          i++;
+          swapBars(i, j);
+          await sleep(speed);
+        }
+        setBarColor(j, '#f2f2f2');
+      }
+      swapBars(i + 1, high);
+      setBarColor(high, '#f2f2f2');
+      return i + 1;
+    }
+
+    function sleep(ms) {
+      return new Promise(res => setTimeout(res, ms));
+    }
+
+    // UI Wiring
+    shuffleBtn.onclick = () => {
+      if (sorting) return;
+      generateBarsRandom();
+    };
+
+    ascBtn.onclick = () => {
+      if (sorting) return;
+      generateBarsAscending();
+    };
+
+    descBtn.onclick = () => {
+      if (sorting) return;
+      generateBarsDescending();
+    };
+
+    sortBtn.onclick = async () => {
+      if (sorting) return;
+      sorting = true;
+      resetBarColors();
+      const algo = algoSelect.value;
+      if (algo === 'bubble') await bubbleSort();
+      else if (algo === 'selection') await selectionSort();
+      else if (algo === 'insertion') await insertionSort();
+      else if (algo === 'quick') await quickSort();
+      resetBarColors();
+      sorting = false;
+    };
+
+    // Init (start shuffled)
+    generateBarsRandom();
+    speedVal.textContent = speedSlider.value;
+  </script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quote Manager</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    .quote-input {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .quote-input input {
+      flex: 1;
+      padding: 0.5rem;
+    }
+    .quote-card {
+      background: #f9f9f9;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border-radius: 5px;
+      position: relative;
+    }
+    .quote-card .title {
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .quote-card .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-top: 0.5rem;
+    }
+    .tag {
+      background: #ccc;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+    }
+    .tag span {
+      margin-left: 0.5rem;
+      cursor: pointer;
+    }
+    .add-tag-btn {
+      background: #ddd;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: crimson;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Quote Manager</h1>
+  <div class="quote-input">
+    <input type="text" id="quoteText" placeholder="Enter a quote...">
+    <button onclick="addQuote()">Add</button>
+  </div>
+  <div id="quoteList"></div>
+
+  <script>
+    let quotes = JSON.parse(localStorage.getItem('quotes') || '[]');
+
+    function saveQuotes() {
+      localStorage.setItem('quotes', JSON.stringify(quotes));
+    }
+
+    function renderQuotes() {
+      const list = document.getElementById('quoteList');
+      list.innerHTML = '';
+      quotes.forEach((quote, index) => {
+        const card = document.createElement('div');
+        card.className = 'quote-card';
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.contentEditable = true;
+        title.textContent = quote.name;
+        title.addEventListener('input', () => {
+          quote.name = title.textContent.trim();
+          saveQuotes();
+        });
+
+        const text = document.createElement('div');
+        text.textContent = quote.text;
+
+        const tagsDiv = document.createElement('div');
+        tagsDiv.className = 'tags';
+
+        quote.tags.forEach((tag, tagIndex) => {
+          const tagEl = document.createElement('div');
+          tagEl.className = 'tag';
+          tagEl.innerHTML = `${tag}<span onclick="removeTag(${index}, ${tagIndex})">&times;</span>`;
+          tagsDiv.appendChild(tagEl);
+        });
+
+        const addTag = document.createElement('div');
+        addTag.className = 'add-tag-btn';
+        addTag.textContent = '+ tag';
+        addTag.onclick = () => {
+          const tagInput = document.createElement('input');
+          tagInput.placeholder = 'new tag';
+          tagInput.onkeypress = e => {
+            if (e.key === 'Enter' && tagInput.value.trim()) {
+              quote.tags.push(tagInput.value.trim());
+              saveQuotes();
+              renderQuotes();
+            }
+          };
+          tagsDiv.appendChild(tagInput);
+          tagInput.focus();
+        };
+
+        tagsDiv.appendChild(addTag);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.onclick = () => {
+          quotes.splice(index, 1);
+          saveQuotes();
+          renderQuotes();
+        };
+
+        card.appendChild(deleteBtn);
+        card.appendChild(title);
+        card.appendChild(text);
+        card.appendChild(tagsDiv);
+        list.prepend(card);
+      });
+    }
+
+    function addQuote() {
+      const input = document.getElementById('quoteText');
+      if (!input.value.trim()) return;
+      quotes.unshift({
+        text: input.value.trim(),
+        name: 'Untitled',
+        tags: []
+      });
+      input.value = '';
+      saveQuotes();
+      renderQuotes();
+    }
+
+    function removeTag(quoteIndex, tagIndex) {
+      quotes[quoteIndex].tags.splice(tagIndex, 1);
+      saveQuotes();
+      renderQuotes();
+    }
+
+    renderQuotes();
+  </script>
+</body>
+</html>
