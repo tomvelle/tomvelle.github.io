@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Drag to Reorder Dialogue</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 720px;
+    margin: 30px auto;
+    background: #f9fafb;
+    color: #222;
+  }
+  h2 {
+    margin-bottom: 10px;
+  }
+  textarea {
+    width: 100%;
+    height: 180px;
+    font-family: monospace;
+    font-size: 15px;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    resize: vertical;
+    transition: border-color 0.25s;
+  }
+  textarea:focus {
+    border-color: #3b82f6;
+    outline: none;
+  }
+  button {
+    margin-top: 12px;
+    padding: 12px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: #3b82f6;
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background-color: #2563eb;
+  }
+  #list {
+    margin-top: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+    min-height: 120px;
+    padding: 10px;
+  }
+  .item {
+    background: #f3f4f6;
+    margin: 6px 0;
+    padding: 10px 14px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+    cursor: grab;
+    user-select: none;
+    font-family: monospace;
+    font-size: 14px;
+    transition: box-shadow 0.15s ease;
+  }
+  .item:active {
+    cursor: grabbing;
+    box-shadow: 0 4px 10px rgb(0 0 0 / 0.2);
+  }
+  .dragging {
+    opacity: 0.5;
+    background: #bfdbfe;
+    box-shadow: 0 8px 16px rgb(59 130 246 / 0.4);
+  }
+  .placeholder {
+    background: #dbeafe;
+    border: 2px dashed #3b82f6;
+    height: 38px;
+    margin: 6px 0;
+    border-radius: 6px;
+  }
+  #output {
+    margin-top: 20px;
+    background: #e5e7eb;
+    border-radius: 6px;
+    padding: 14px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    min-height: 120px;
+    border: 1px solid #ccc;
+  }
+</style>
+</head>
+<body>
+
+<h2>Paste dialogue text and reorder by dragging lines up and down:</h2>
+<textarea id="inputText" placeholder="Paste your dialogue text here..."></textarea>
+<br />
+<button id="loadBtn">Load lines</button>
+
+<div id="list" aria-label="Draggable dialogue lines" role="list"></div>
+
+<button id="exportBtn" style="display:none;">Get reordered text</button>
+
+<h3>Reordered Text Output:</h3>
+<pre id="output"></pre>
+
+<script>
+  const inputText = document.getElementById('inputText');
+  const loadBtn = document.getElementById('loadBtn');
+  const list = document.getElementById('list');
+  const exportBtn = document.getElementById('exportBtn');
+  const output = document.getElementById('output');
+
+  let draggedItem = null;
+  let placeholder = document.createElement('div');
+  placeholder.className = 'placeholder';
+
+  function createItem(text) {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.textContent = text;
+    div.setAttribute('draggable', true);
+    div.setAttribute('role', 'listitem');
+
+    div.addEventListener('dragstart', e => {
+      draggedItem = div;
+      div.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', ''); // for Firefox compatibility
+      setTimeout(() => div.style.display = 'none', 0);
+    });
+
+    div.addEventListener('dragend', e => {
+      draggedItem = null;
+      div.classList.remove('dragging');
+      div.style.display = 'block';
+      placeholder.remove();
+    });
+
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (div === draggedItem) return;
+      const rect = div.getBoundingClientRect();
+      const offset = e.clientY - rect.top;
+      if (offset > rect.height / 2) {
+        // insert placeholder after this div
+        if (div.nextSibling !== placeholder) {
+          list.insertBefore(placeholder, div.nextSibling);
+        }
+      } else {
+        // insert placeholder before this div
+        if (div.previousSibling !== placeholder) {
+          list.insertBefore(placeholder, div);
+        }
+      }
+    });
+
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      if (placeholder.parentNode === list) {
+        list.insertBefore(draggedItem, placeholder);
+        placeholder.remove();
+      }
+    });
+
+    return div;
+  }
+
+  loadBtn.addEventListener('click', () => {
+    list.innerHTML = '';
+    output.textContent = '';
+    exportBtn.style.display = 'none';
+
+    const lines = inputText.value.split('\n').filter(l => l.trim() !== '');
+    lines.forEach(line => {
+      const item = createItem(line);
+      list.appendChild(item);
+    });
+
+    if (lines.length) {
+      exportBtn.style.display = 'inline-block';
+    }
+  });
+
+  exportBtn.addEventListener('click', () => {
+    const lines = [];
+    list.querySelectorAll('.item').forEach(item => lines.push(item.textContent));
+    output.textContent = lines.join('\n');
+  });
+</script>
+
+</body>
+</html>

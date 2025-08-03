@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paste Highlighter</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #f6f6f6;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      padding: 1rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      resize: vertical;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+    }
+    .post {
+      margin-top: 2rem;
+      background: white;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.1);
+      white-space: pre-wrap;
+    }
+    .ai-text {
+      text-decoration-line: underline;
+      text-decoration-style: wavy;
+      text-decoration-color: purple;
+    }
+  </style>
+</head>
+<body>
+  <h1>Make a Post</h1>
+  <textarea id="editor" placeholder="Type or paste something here..."></textarea>
+  <button onclick="submitPost()">Post</button>
+
+  <div id="output"></div>
+
+  <script>
+    let pasteRanges = [];
+    const textarea = document.getElementById("editor");
+
+    textarea.addEventListener("paste", (e) => {
+      const start = textarea.selectionStart;
+      const pastedText = e.clipboardData.getData("text/plain");
+      const end = start + pastedText.length;
+      pasteRanges.push({ start, end });
+    });
+
+    function submitPost() {
+      const raw = textarea.value;
+      let output = "";
+
+      if (pasteRanges.length === 0) {
+        output = raw;
+      } else {
+        pasteRanges.sort((a, b) => a.start - b.start);
+        let cursor = 0;
+        for (const range of pasteRanges) {
+          if (cursor < range.start) {
+            output += escapeHTML(raw.slice(cursor, range.start));
+          }
+          output += `<span class="ai-text">${escapeHTML(raw.slice(range.start, range.end))}</span>`;
+          cursor = range.end;
+        }
+        output += escapeHTML(raw.slice(cursor));
+      }
+
+      document.getElementById("output").innerHTML = `<div class="post">${output}</div>`;
+      textarea.value = "";
+      pasteRanges = [];
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>

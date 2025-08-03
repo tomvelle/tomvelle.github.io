@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ti2meline Editor</title>
+  <link href="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.css" rel="stylesheet">
+  <style>
+    body { background: #1e1e2e; color: #ddd; font-family: sans-serif; margin: 20px; }
+    #controls { margin-bottom: 10px; }
+    input, button { background: #2e2e3e; color: #ddd; border: 1px solid #555; padding: 4px; }
+    button:hover { background: #3e3e4e; }
+    #timeline { overflow-x: auto; border: 1px solid #444; position: relative; }
+    #timeline-header { display: flex; height: 30px; border-bottom: 1px solid #444; margin-left: 150px; width: calc(100% - 150px - 30px); }
+    .tick { flex: 1; border-right: 1px solid #555; text-align: center; font-size: 12px; }
+    .tracks { }
+    .track { display: flex; height: 50px; border-bottom: 1px solid #444; }
+    .track-label { width: 150px; padding: 5px; border-right: 1px solid #444; }
+    .track-body { flex: 1; position: relative; }
+    .track-add { width: 30px; display: flex; align-items: center; justify-content: center; border-left: 1px solid #444; cursor: pointer; font-size: 18px; }
+    .track-add:hover { background: #3a3a4a; }
+    .segment { position: absolute; height: 30px; background: rgba(0,123,255,0.5); border: 1px solid #007bff; border-radius: 3px; cursor: move; color: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; padding: 0 4px; }
+    #segment-slider { position: absolute; display: none; background: #2e2e3e; border: 1px solid #555; padding: 10px; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); z-index: 1000; width: 350px; }
+    #range-slider { margin: 10px 0; }
+    .label-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
+    #slider-label-input { width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label>T1imeline Start: <input type="date" id="range-start"></label>
+    <label>End: <input type="date" id="range-end"></label>
+    <button id="add-row">Add Row</button>
+  </div>
+  <div id="timeline">
+    <div id="timeline-header"></div>
+    <div class="tracks" id="tracks"></div>
+  </div>
+  <div id="segment-slider">
+    <input id="slider-label-input" placeholder="Label (e.g. Place lived)">
+    <div class="label-row">
+      <span id="slider-start-label">YYYY-MM-DD</span>
+      <span id="slider-end-label">YYYY-MM-DD</span>
+    </div>
+    <div id="range-slider"></div>
+    <button id="slider-confirm">Save</button>
+    <button id="slider-cancel">Cancel</button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.js"></script>
+  <script>
+    let minDate, maxDate, totalRange, currentParent, currentSegment;
+    let sliderCreated = false;
+    const labelWidth = 150;
+    const btnWidth = 30;
+    const headerEl = document.getElementById('timeline-header');
+    const tracksEl = document.getElementById('tracks');
+    const sliderEl = document.getElementById('segment-slider');
+    const startLabel = document.getElementById('slider-start-label');
+    const endLabel = document.getElementById('slider-end-label');
+    const confirmBtn = document.getElementById('slider-confirm');
+    const cancelBtn = document.getElementById('slider-cancel');
+    const rangeSlider = document.getElementById('range-slider');
+    const labelInput = document.getElementById('slider-label-input');
+
+    document.getElementById('range-start').valueAsDate = new Date(new Date().getFullYear(), 0, 1);
+    document.getElementById('range-end').valueAsDate = new Date(new Date().getFullYear(), 11, 31);
+    document.getElementById('range-start').addEventListener('change', updateHeaderAndSegments);
+    document.getElementById('range-end').addEventListener('change', updateHeaderAndSegments);
+    document.getElementById('add-row').addEventListener('click', addRow);
+
+    confirmBtn.addEventListener('click', () => {
+      const [sPct, ePct] = rangeSlider.noUiSlider.get().map(parseFloat);
+      const startDate = new Date(minDate.getTime() + sPct/100 * totalRange);
+      const endDate = new Date(minDate.getTime() + ePct/100 * totalRange);
+      if (currentSegment) {
+        currentSegment.dataset.start = startDate.toISOString();
+        currentSegment.dataset.end = endDate.toISOString();
+        currentSegment.innerText = labelInput.value || currentSegment.dataset.start.split('T')[0] + ' – ' + currentSegment.dataset.end.split('T')[0];
+        posSegment(currentSegment);
+      } else if (currentParent) {
+        const seg = createSegment(startDate, endDate, currentParent);
+        posSegment(seg);
+      }
+      closeSlider();
+    });
+
+    cancelBtn.addEventListener('click', closeSlider);
+
+    function updateHeaderAndSegments() {
+      minDate = new Date(document.getElementById('range-start').value);
+      maxDate = new Date(document.getElementById('range-end').value);
+      totalRange = maxDate - minDate;
+      updateHeader();
+      document.querySelectorAll('.segment').forEach(posSegment);
+    }
+
+    function updateHeader() {
+      headerEl.innerHTML = '';
+      headerEl.style.marginLeft = labelWidth + 'px';
+      headerEl.style.width = `calc(100% - ${labelWidth + btnWidth}px)`;
+      for (let y = minDate.getFullYear(); y <= maxDate.getFullYear(); y++) {
+        const tick = document.createElement('div');
+        tick.className = 'tick';
+        tick.textContent = y;
+        headerEl.appendChild(tick);
+      }
+    }
+
+    function addRow() {
+      const track = document.createElement('div'); track.className = 'track';
+      const label = document.createElement('div'); label.className = 'track-label';
+      const input = document.createElement('input'); input.placeholder = 'Subject';
+      label.appendChild(input);
+      const body = document.createElement('div'); body.className = 'track-body';
+      const addBtn = document.createElement('div'); addBtn.className = 'track-add'; addBtn.textContent = '+';
+      addBtn.addEventListener('click', e => openSlider(e, body));
+      track.append(label, body, addBtn);
+      tracksEl.appendChild(track);
+    }
+
+    function openSlider(event, parent, segment = null) {
+      currentParent = parent;
+      currentSegment = segment;
+      labelInput.value = segment ? (segment.dataset.label || '') : '';
+      if (!sliderCreated) {
+        noUiSlider.create(rangeSlider, { start: [0, 100], connect: true, range: { min: 0, max: 100 } });
+        rangeSlider.noUiSlider.on('update', vals => {
+          const [s, e] = vals.map(parseFloat);
+          const sd = new Date(minDate.getTime() + s/100 * totalRange);
+          const ed = new Date(minDate.getTime() + e/100 * totalRange);
+          startLabel.textContent = sd.toISOString().split('T')[0];
+          endLabel.textContent = ed.toISOString().split('T')[0];
+        });
+        sliderCreated = true;
+      }
+      updateHeaderAndSegments();
+      if (segment) {
+        const sPct = (new Date(segment.dataset.start) - minDate) / totalRange * 100;
+        const ePct = (new Date(segment.dataset.end)   - minDate) / totalRange * 100;
+        rangeSlider.noUiSlider.set([sPct, ePct]);
+      } else {
+        rangeSlider.noUiSlider.set([0, 100]);
+      }
+      // clamp slider panel on-screen
+      sliderEl.style.visibility = 'hidden';
+      sliderEl.style.display = 'block';
+      const sw = sliderEl.offsetWidth, sh = sliderEl.offsetHeight;
+      let x = event.clientX + window.scrollX;
+      let y = event.clientY + window.scrollY;
+      const cw = document.documentElement.clientWidth;
+      const ch = document.documentElement.clientHeight;
+      const pad = 10;
+      if (event.clientX + sw + pad > cw) x = window.scrollX + cw - sw - pad;
+      if (event.clientY + sh + pad > ch) y = window.scrollY + ch - sh - pad;
+      sliderEl.style.left = x + 'px';
+      sliderEl.style.top  = y + 'px';
+      sliderEl.style.visibility = 'visible';
+    }
+
+    function closeSlider() {
+      sliderEl.style.display = 'none';
+      currentParent = currentSegment = null;
+    }
+
+    function createSegment(start, end, parent) {
+      const seg = document.createElement('div'); seg.className = 'segment';
+      seg.dataset.start = start.toISOString();
+      seg.dataset.end   = end.toISOString();
+      seg.dataset.label = labelInput.value;
+      seg.innerText = labelInput.value || start.toISOString().split('T')[0] + ' – ' + end.toISOString().split('T')[0];
+      enableInteract(seg);
+      parent.appendChild(seg);
+      return seg;
+    }
+
+    function posSegment(el) {
+      const w = el.parentElement.clientWidth;
+      const start = new Date(el.dataset.start);
+      const end   = new Date(el.dataset.end);
+      const left  = (start - minDate) / totalRange * w;
+      const width = (end - start) / totalRange * w;
+      el.style.left  = left + 'px';
+      el.style.width = width + 'px';
+      el.title = el.dataset.label || `${start.toDateString()} - ${end.toDateString()}`;
+    }
+
+    function enableInteract(el) {
+      interact(el)
+        .draggable({ inertia: true, restrict: { restriction: 'parent', elementRect: { left: 0, right: 1, top: 0, bottom: 1 } }, onmove: dragMoveListener, onend: () => { updateSegmentDates(el); posSegment(el); } })
+        .resizable({ edges: { left: true, right: true }, restrictEdges: { outer: 'parent' }, inertia: true })
+        .on('resizemove', event => { const t = event.target; let x = parseFloat(t.style.left) + event.deltaRect.left; let w = event.rect.width; t.style.left = x + 'px'; t.style.width = w + 'px'; })
+        .on('resizeend', () => { updateSegmentDates(el); posSegment(el); });
+      el.addEventListener('dblclick', e => openSlider(e, el.parentElement, el));
+    }
+
+    function dragMoveListener(event) {
+      const t = event.target;
+      const x = parseFloat(t.style.left) || 0;
+      t.style.left = x + event.dx + 'px';
+    }
+
+    function updateSegmentDates(el) {
+      const w = el.parentElement.clientWidth;
+      const left = parseFloat(el.style.left);
+      const width = parseFloat(el.style.width);
+      const ns = new Date(minDate.getTime() + left / w * totalRange);
+      const ne = new Date(minDate.getTime() + (left + width) / w * totalRange);
+      el.dataset.start = ns.toISOString();
+      el.dataset.end   = ne.toISOString();
+    }
+
+    updateHeaderAndSegments();
+  </script>
+</body>
+</html>
