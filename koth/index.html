@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>King of the Hill Transcripts</title>
+  <style>
+    body {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      padding: 30px;
+    }
+    h1 {
+      margin-bottom: 0.5em;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    a {
+      color: #36a3d9;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    #transcript {
+      margin-top: 30px;
+      white-space: pre-wrap;
+      background: #111;
+      padding: 20px;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>King of the Hill Transcript Viewer</h1>
+  <ul id="episodeList"></ul>
+  <div id="transcript"></div>
+
+  <script>
+    const folder = 'scripts/';
+    const extensions = ['.txt', '.srt'];
+    const listEl = document.getElementById('episodeList');
+    const transcriptEl = document.getElementById('transcript');
+
+    const files = [
+      // 🧠 Populate this list manually or generate with a script
+      "King of the Hill S01E01 Pilot.txt",
+      "King of the Hill S01E02 Square Peg.txt",
+      "King of the Hill S01E03 Order of the Straight Arrow.txt",
+      "King of the Hill S01E04 Hank's Got the Willies.txt"
+    ];
+
+    files.forEach(filename => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = "#";
+      a.textContent = filename.replace("King of the Hill ", "").replace(".txt", "");
+      a.onclick = () => {
+        fetch(folder + filename)
+          .then(res => res.text())
+          .then(text => {
+            transcriptEl.textContent = text;
+            transcriptEl.scrollIntoView({ behavior: 'smooth' });
+          })
+          .catch(() => {
+            transcriptEl.textContent = "Failed to load transcript.";
+          });
+      };
+      li.appendChild(a);
+      listEl.appendChild(li);
+    });
+  </script>
+</body>
+</html>
