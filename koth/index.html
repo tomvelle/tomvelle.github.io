@@ -2,79 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>King of the Hill Transcripts</title>
+  <title>King of the Hill Transcript Viewer</title>
   <style>
     body {
       background: #1a1a1a;
       color: #e0e0e0;
       font-family: sans-serif;
       padding: 30px;
+      display: flex;
+      flex-direction: row;
+      gap: 40px;
     }
+
+    #sidebar {
+      width: 280px;
+    }
+
+    #transcript-container {
+      flex-grow: 1;
+      max-height: 90vh;
+      overflow-y: auto;
+      border-left: 1px solid #444;
+      padding-left: 30px;
+    }
+
     h1 {
       margin-bottom: 0.5em;
     }
+
     ul {
       list-style: none;
       padding: 0;
     }
+
     li {
       margin-bottom: 8px;
     }
+
     a {
       color: #36a3d9;
       text-decoration: none;
     }
+
     a:hover {
       text-decoration: underline;
     }
+
+    #search {
+      margin-bottom: 20px;
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+    }
+
     #transcript {
-      margin-top: 30px;
       white-space: pre-wrap;
-      background: #111;
-      padding: 20px;
-      border: 1px solid #333;
     }
   </style>
 </head>
 <body>
 
-  <h1>King of the Hill Transcript Viewer</h1>
-  <ul id="episodeList"></ul>
-  <div id="transcript"></div>
+  <div id="sidebar">
+    <h1>KOTH Viewer</h1>
+    <input id="search" type="text" placeholder="Search all episodes..." />
+    <ul id="episodeList"></ul>
+  </div>
+
+  <div id="transcript-container">
+    <div id="transcript">Select an episode to view transcript.</div>
+  </div>
 
   <script>
     const folder = 'scripts/';
-    const extensions = ['.txt', '.srt'];
-    const listEl = document.getElementById('episodeList');
-    const transcriptEl = document.getElementById('transcript');
-
     const files = [
-      // 🧠 Populate this list manually or generate with a script
+      // Add full list of .txt files here
       "King of the Hill S01E01 Pilot.txt",
       "King of the Hill S01E02 Square Peg.txt",
       "King of the Hill S01E03 Order of the Straight Arrow.txt",
       "King of the Hill S01E04 Hank's Got the Willies.txt"
     ];
 
-    files.forEach(filename => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = "#";
-      a.textContent = filename.replace("King of the Hill ", "").replace(".txt", "");
-      a.onclick = () => {
-        fetch(folder + filename)
-          .then(res => res.text())
-          .then(text => {
-            transcriptEl.textContent = text;
-            transcriptEl.scrollIntoView({ behavior: 'smooth' });
-          })
-          .catch(() => {
-            transcriptEl.textContent = "Failed to load transcript.";
-          });
-      };
-      li.appendChild(a);
-      listEl.appendChild(li);
+    const searchInput = document.getElementById('search');
+    const listEl = document.getElementById('episodeList');
+    const transcriptEl = document.getElementById('transcript');
+    const transcriptContainer = document.getElementById('transcript-container');
+
+    function formatLabel(filename) {
+      return filename
+        .replace("King of the Hill ", "")
+        .replace(".txt", "")
+        .replace(/_/g, " ");
+    }
+
+    function loadTranscript(filename) {
+      fetch(folder + filename)
+        .then(res => res.text())
+        .then(text => {
+          transcriptEl.textContent = text;
+          transcriptEl.scrollTop = 0;
+        })
+        .catch(() => {
+          transcriptEl.textContent = "Failed to load transcript.";
+        });
+    }
+
+    function renderList(filter = "") {
+      listEl.innerHTML = "";
+      files.forEach(filename => {
+        const label = formatLabel(filename);
+        if (label.toLowerCase().includes(filter.toLowerCase())) {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = "#";
+          a.textContent = label;
+          a.onclick = () => loadTranscript(filename);
+          li.appendChild(a);
+          listEl.appendChild(li);
+        }
+      });
+    }
+
+    searchInput.addEventListener("input", (e) => {
+      renderList(e.target.value);
     });
+
+    renderList(); // initial load
   </script>
 </body>
 </html>
