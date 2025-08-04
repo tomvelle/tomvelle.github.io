@@ -101,16 +101,14 @@
 <body>
   <header>
     <h1>KOTH Transcript Viewer</h1>
-    <button class="mode-toggle" onclick="toggleMode()" id="modeBtn">Switch to Search View</button>
   </header>
   <div id="main">
     <div id="left">
-      <input type="text" id="search" placeholder="Search all transcripts..." style="display: none;" />
       <ul id="episodeList"></ul>
     </div>
     <div id="right">
       <h2 id="transcript-title">Transcript</h2>
-      <div id="transcript">Select an episode to load or switch to Search View above.</div>
+      <div id="transcript">Select an episode to load.</div>
     </div>
   </div>
 
@@ -381,19 +379,6 @@
     const transcriptEl = document.getElementById("transcript");
     const transcriptTitleEl = document.getElementById("transcript-title");
     const episodeList = document.getElementById("episodeList");
-    const searchInput = document.getElementById("search");
-    const modeBtn = document.getElementById("modeBtn");
-
-    let mode = "browse";
-
-    function toggleMode() {
-      mode = (mode === "browse") ? "search" : "browse";
-      modeBtn.textContent = mode === "browse" ? "Switch to Search View" : "Switch to Browse View";
-      searchInput.style.display = mode === "search" ? "block" : "none";
-      episodeList.style.display = mode === "browse" ? "block" : "none";
-      transcriptTitleEl.textContent = mode === "browse" ? "Transcript" : "Search Results";
-      transcriptEl.innerHTML = mode === "browse" ? "Select an episode to load." : "Type at least 2 characters to search.";
-    }
 
     files.forEach(file => {
       fetch(folder + file)
@@ -418,29 +403,6 @@
       };
       li.appendChild(a);
       episodeList.appendChild(li);
-    });
-
-    function highlight(text, query) {
-      return text.replace(new RegExp(`(${query})`, 'gi'), '<mark>$1</mark>');
-    }
-
-    searchInput.addEventListener("input", e => {
-      const query = e.target.value.trim().toLowerCase();
-      if (!query || query.length < 2) {
-        transcriptEl.innerHTML = "Type at least 2 characters to search.";
-        return;
-      }
-      const matches = lineIndex.filter(entry => entry.text.toLowerCase().includes(query));
-      if (!matches.length) {
-        transcriptEl.innerHTML = "No matches found.";
-        return;
-      }
-      transcriptEl.innerHTML = matches.slice(0, 200).map(match => `
-        <div class="result-line">
-          <div class="result-episode">${match.file.replace("King of the Hill ", "").replace(".txt", "")}</div>
-          <div class="quote">${highlight(match.text, query)}</div>
-        </div>
-      `).join('');
     });
   </script>
 </body>
