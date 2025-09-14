@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lyrics Case, Copy & SRT</title>
+  <style>
+    :root { --bg:#0f1115; --card:#171923; --ink:#e7e9ee; --muted:#9aa3b2; --accent:#3b82f6; }
+    html,body{height:100%}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue"; background:var(--bg); color:var(--ink);}
+    .wrap{max-width:1000px; margin:32px auto; padding:0 16px}
+    h1{font-size:22px; margin:0 0 14px}
+    p{color:var(--muted); margin:6px 0 14px}
+    .grid{display:grid; grid-template-columns:1fr; gap:14px}
+    .row{display:grid; gap:12px; grid-template-columns:1fr}
+    @media(min-width:900px){ .row{grid-template-columns:1fr 360px} }
+    textarea{width:100%; min-height:220px; resize:vertical; padding:12px; border-radius:12px; border:1px solid #2a2f3a; background:var(--card); color:var(--ink); line-height:1.4}
+    .panel{background:var(--card); border:1px solid #2a2f3a; border-radius:12px; padding:12px}
+    fieldset{border:none; margin:0; padding:0}
+    .opts{display:grid; gap:10px}
+    .opts label{display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted)}
+    .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+    button{appearance:none; border:none; border-radius:10px; padding:10px 14px; background:#253049; color:#e9eefc; cursor:pointer}
+    button.primary{background:var(--accent); color:white}
+    button:disabled{opacity:.6; cursor:not-allowed}
+    .out{display:grid; gap:10px; margin-top:18px}
+    .line{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; border:1px dashed #30384a; background:#121521}
+    .line span{white-space:pre-wrap; word-break:break-word; flex:1}
+    .copy{flex:0 0 auto}
+    .pill{font-size:12px; color:#a8b3c7}
+    .pill input[type="number"]{width:90px; margin-left:6px; padding:6px; border-radius:8px; border:1px solid #2a2f3a; background:#0f1320; color:#e7e9ee}
+    .count{color:var(--muted); font-size:13px}
+    .toast{position:fixed; inset:auto 16px 16px auto; background:#1f2937; color:#ecfeff; padding:10px 12px; border-radius:10px; opacity:0; transform:translateY(8px); transition:all .2s ease}
+    .toast.show{opacity:1; transform:translateY(0)}
+    .help{font-size:12px; color:#a8b3c7}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Lyrics Case, Copy & Word-SRT Export</h1>
+    <p>Paste lyrics, choose casing, then Process. Click any line to copy it. Export each word as its own SRT cue.</p>
+
+    <div class="grid">
+      <div class="row">
+        <textarea id="input" placeholder="Paste lyrics here..."></textarea>
+        <div class="panel">
+          <fieldset class="opts">
+            <label>
+              <input type="radio" name="case" value="title" checked />
+              <span>Title Case</span>
+            </label>
+            <label>
+              <input type="radio" name="case" value="sentence" />
+              <span>Sentence case</span>
+            </label>
+            <label>
+              <input type="radio" name="case" value="upper" />
+              <span>UPPERCASE</span>
+            </label>
+            <label>
+              <input type="radio" name="case" value="lower" />
+              <span>lowercase</span>
+            </label>
+            <hr style="border:none;border-top:1px solid #2a2f3a">
+            <label>
+              <input type="checkbox" id="trimEmpty" checked />
+              <span>Remove empty lines</span>
+            </label>
+            <label>
+              <input type="checkbox" id="collapseSpaces" checked />
+              <span>Collapse extra spaces</span>
+            </label>
+            <label>
+              <input type="checkbox" id="asciiOnly" checked />
+              <span>No special characters (ASCII only)</span>
+            </label>
+            <label>
+              <input type="checkbox" id="keepBasicPunct" checked />
+              <span>Keep basic punctuation . , ! ? : ; ' " ( ) - & /</span>
+            </label>
+          </fieldset>
+          <div class="actions">
+            <button class="primary" id="process">Process</button>
+            <button id="pasteFromClipboard">Paste from clipboard</button>
+            <button id="copyAll" disabled>Copy all to clipboard</button>
+            <span class="count" id="count"></span>
+          </div>
+
+          <div class="actions" id="srtControls">
+            <label class="pill">Word duration (ms)
+              <input type="number" id="wordMs" value="500" min="50" max="10000">
+            </label>
+            <label class="pill">Gap (ms)
+              <input type="number" id="gapMs" value="0" min="0" max="5000">
+            </label>
+            <label class="pill"><input type="checkbox" id="stripPunctForSRT" checked style="margin-right:6px;">Strip punctuation for SRT</label>
+            <button id="exportSRT">Export words to SRT</button>
+          </div>
+
+          <p class="help">Em dashes and curly quotes are replaced. Accents are stripped. Non-ASCII removed when ASCII only is on.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div id="output" class="out" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied</div>
+
+  <script>
+    const inputEl = document.getElementById('input');
+    const outEl = document.getElementById('output');
+    const processBtn = document.getElementById('process');
+    const pasteBtn = document.getElementById('pasteFromClipboard');
+    const copyAllBtn = document.getElementById('copyAll');
+    const countEl = document.getElementById('count');
+    const toast = document.getElementById('toast');
+
+    // SRT controls
+    const exportSrtBtn = document.getElementById('exportSRT');
+    const wordMsEl = document.getElementById('wordMs');
+    const gapMsEl = document.getElementById('gapMs');
+    const stripPunctForSRTEl = document.getElementById('stripPunctForSRT');
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'), 900);
+    }
+
+    // Replace typographic punctuation with plain ASCII
+    function asciiPunctuation(s){
+      const map = {
+        '\u2018':'\'', '\u2019':'\'', '\u201B':'\'', '\u2032':'\'',
+        '\u201C':'"', '\u201D':'"', '\u2033':'"',
+        '\u2013':'-', '\u2014':'-', '\u2212':'-',
+        '\u2026':'...', '\u00A0':' ', '\u200B':'', '\u2010':'-'
+      };
+      return s.replace(/[\u2018\u2019\u201B\u2032\u201C\u201D\u2033\u2013\u2014\u2212\u2026\u00A0\u200B\u2010]/g, ch => map[ch] || '');
+    }
+
+    function stripAccents(s){
+      return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function sanitizeLine(line, opts){
+      let s = line.replace(/\t/g, ' ');
+      s = asciiPunctuation(s);
+      s = stripAccents(s);
+      if (opts.collapseSpaces) s = s.replace(/\s+/g, ' ');
+      s = s.trim();
+      if (opts.asciiOnly){
+        const allowed = opts.keepBasicPunct
+          ? /[^A-Za-z0-9 \.,!\?:;'"()\-\&\/]/g
+          : /[^A-Za-z0-9 ]/g;
+        s = s.replace(allowed, '');
+      }
+      return s;
+    }
+
+    function toTitleCase(str){
+      if (!str) return str;
+      const lowers = new Set(['a','an','the','and','but','or','nor','as','at','by','for','in','of','on','per','to','vs','via','with','is','if','than','over','under','into','onto','from']);
+      const words = str.toLowerCase().split(/\s+/);
+      const last = words.length - 1;
+      return words.map((w,i)=>{
+        if(!w) return '';
+        if(i!==0 && i!==last && lowers.has(w)) return w;
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join(' ');
+    }
+
+    function toSentenceCase(str){
+      if (!str) return str;
+      let s = str.toLowerCase();
+      s = s.replace(/^[\s]*([a-z])/, (_,c)=>c.toUpperCase());
+      s = s.replace(/\bi\b/g, 'I');
+      return s;
+    }
+
+    function applyCasing(line, mode){
+      switch(mode){
+        case 'title': return toTitleCase(line);
+        case 'sentence': return toSentenceCase(line);
+        case 'upper': return line.toUpperCase();
+        case 'lower': return line.toLowerCase();
+        default: return line;
+      }
+    }
+
+    function getCaseMode(){
+      return document.querySelector('input[name="case"]:checked').value;
+    }
+
+    function getOpts(){
+      return {
+        collapseSpaces: document.getElementById('collapseSpaces').checked,
+        asciiOnly: document.getElementById('asciiOnly').checked,
+        keepBasicPunct: document.getElementById('keepBasicPunct').checked,
+        trimEmpty: document.getElementById('trimEmpty').checked,
+      };
+    }
+
+    function getProcessedLines(){
+      const opts = getOpts();
+      const mode = getCaseMode();
+      const raw = inputEl.value.replace(/\r\n?/g, '\n');
+      let lines = raw.split('\n').map(l => sanitizeLine(l, opts));
+      if (opts.trimEmpty) lines = lines.filter(l => l.length);
+      lines = lines.map(l => applyCasing(l, mode));
+      return lines;
+    }
+
+    function process(){
+      render(getProcessedLines());
+    }
+
+    function render(lines){
+      outEl.innerHTML = '';
+      copyAllBtn.disabled = lines.length === 0;
+      countEl.textContent = lines.length ? `${lines.length} lines` : '';
+      lines.forEach((text, idx) => {
+        const row = document.createElement('div');
+        row.className = 'line';
+        const span = document.createElement('span');
+        span.textContent = text;
+        const btn = document.createElement('button');
+        btn.className = 'copy';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(text); showToast('Copied line ' + (idx+1)); } catch(e){ showToast('Copy failed'); }
+        });
+        span.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(text); showToast('Copied line ' + (idx+1)); } catch(e){ showToast('Copy failed'); }
+        });
+        row.appendChild(span);
+        row.appendChild(btn);
+        outEl.appendChild(row);
+      });
+    }
+
+    processBtn.addEventListener('click', process);
+
+    pasteBtn.addEventListener('click', async () => {
+      try {
+        const t = await navigator.clipboard.readText();
+        if (t) { inputEl.value = t; process(); }
+      } catch(e) {
+        showToast('Clipboard blocked');
+      }
+    });
+
+    copyAllBtn.addEventListener('click', async () => {
+      const texts = [...document.querySelectorAll('.line span')].map(s => s.textContent);
+      if (!texts.length) return;
+      try {
+        await navigator.clipboard.writeText(texts.join('\n'));
+        showToast('All lines copied');
+      } catch(e) {
+        showToast('Copy failed');
+      }
+    });
+
+    // SRT helpers
+    function srtTime(ms){
+      const h = Math.floor(ms/3600000);
+      const m = Math.floor((ms%3600000)/60000);
+      const s = Math.floor((ms%60000)/1000);
+      const msRem = ms % 1000;
+      const pad = (n, w=2) => String(n).padStart(w,'0');
+      return `${pad(h)}:${pad(m)}:${pad(s)},${String(msRem).padStart(3,'0')}`;
+    }
+
+    function wordsForSRT(lines, stripPunct){
+      let text = lines.join(' ').trim();
+      if (stripPunct){
+        text = text.replace(/[\.,!\?:;'"()\-\&\/]/g, '');
+      }
+      const words = text.split(/\s+/).map(w=>w.trim()).filter(Boolean);
+      return words;
+    }
+
+    function buildSrt(words, wordMs, gapMs){
+      let t = 0; let idx = 1; let blocks = [];
+      for (const w of words){
+        const start = srtTime(t);
+        const end = srtTime(t + wordMs);
+        blocks.push(`${idx}\n${start} --> ${end}\n${w}\n`);
+        idx++; t += wordMs + gapMs;
+      }
+      return blocks.join('\n');
+    }
+
+    exportSrtBtn.addEventListener('click', () => {
+      const lines = getProcessedLines();
+      if (!lines.length){ showToast('Nothing to export'); return; }
+      const words = wordsForSRT(lines, stripPunctForSRTEl.checked);
+      if (!words.length){ showToast('No words found'); return; }
+      const wordMs = Math.max(50, parseInt(wordMsEl.value||'500',10));
+      const gapMs = Math.max(0, parseInt(gapMsEl.value||'0',10));
+      const srt = buildSrt(words, wordMs, gapMs);
+      const blob = new Blob([srt], {type:'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'lyrics_words.srt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('SRT downloaded');
+    });
+
+    // Keyboard: Ctrl+Enter to process
+    inputEl.addEventListener('keydown', (e)=>{
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') process();
+    });
+  </script>
+</body>
+</html>

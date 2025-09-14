@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Color Swatch Generator</title>
+  <style>
+    :root {
+  --bg:#0f1115; --panel:#161a22; --text:#e8eaf0; --sub:#aab2c0; --accent:#2dc5ae;
+  --good:#22c55e; --bad:#ef4444;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  background:var(--bg); color:var(--text); min-height:100dvh;
+  display:grid; grid-template-rows:auto 1fr auto;
+}
+header{padding:12px 16px; border-bottom:1px solid #1c212c; background:linear-gradient(180deg,rgba(45,197,174,.12),transparent)}
+header h1{margin:0; font-size:18px; letter-spacing:.2px}
+
+/* LAYOUT */
+main{
+  padding:12px; display:grid; gap:12px;
+  grid-template-columns: clamp(240px,32vw,320px);
+  max-width:1100px; margin:0 auto;
+}
+@media (max-width: 900px){
+  main{ grid-template-columns:1fr }
+}
+
+/* CARDS */
+.card{background:var(--panel); border:1px solid #1c212c; border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.card h2{font-size:13px; font-weight:600; margin:0; color:var(--sub)}
+.section{padding:12px; display:grid; gap:10px}
+
+/* FORM GRID */
+.row{display:grid; gap:8px; grid-template-columns:1fr 1fr}
+@media (max-width: 1100px){ .row{ grid-template-columns:1fr } }
+.ctrl{display:grid; gap:6px}
+label{font-size:12px; color:var(--sub)}
+
+/* INPUTS */
+input[type="color"]{appearance:none;-webkit-appearance:none;border:none;width:100%;height:36px;border-radius:10px;cursor:pointer;background:#0000}
+input[type="number"], input[type="text"], select{
+  width:100%; background:#0f1320; border:1px solid #202635; color:var(--text);
+  border-radius:10px; padding:8px 10px; font-size:14px;
+}
+input[type="checkbox"]{width:16px;height:16px}
+
+/* BUTTONS */
+.btn{background:#0f1320;border:1px solid #223047;color:var(--text);border-radius:10px;padding:8px 10px;font-size:13px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:#1c8d7d;color:#061410;font-weight:600}
+.btn.inline{padding:6px 8px;font-size:12px;border-radius:8px}
+.btn:active{transform:translateY(1px)}
+.row-inline{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+
+/* PREVIEW */
+.preview-wrap{padding:12px;display:grid;gap:10px;align-content:start;max-width:720px;margin:0 auto}
+canvas{
+  width:100%; max-width:420px; height:auto; display:block; margin-inline:auto;
+  border-radius:12px; border:1px solid #1c212c; background:#0b0e14;
+}
+@media (max-width: 900px){ canvas{ max-width:340px } }
+
+/* BADGES / SWATCHES */
+.badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid #2b3342;color:var(--sub)}
+.ok{color:var(--good);border-color:#204a2c;background:rgba(34,197,94,.08)}
+.fail{color:var(--bad);border-color:#4a2020;background:rgba(239,68,68,.08)}
+.grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+.swatch-card{background:#0f1320;border:1px solid #1c212c;border-radius:12px;overflow:hidden}
+.swatch-top{height:64px}
+.swatch-body{padding:8px 10px;display:grid;gap:6px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    footer {
+      margin-top: auto;
+      color: var(--sub);
+      border-top: 1px solid #1c212c;
+      font-size: 12px;
+      text-align: center;
+      background: linear-gradient(180deg, transparent, rgba(45,197,174,0.12));
+      padding: 12px 16px;
+    }
+a{color:var(--accent);text-decoration:none}
+
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Color Swatch Generator</h1>
+  </header>
+
+  <main>
+    <!-- Controls -->
+    <section class="card section" aria-labelledby="controls-title">
+      <h2 id="controls-title">Controls</h2>
+      <div class="row">
+        <div class="ctrl">
+          <label for="picker">Color</label>
+          <input id="picker" type="color" value="#2dc5ae" />
+        </div>
+        <div class="ctrl">
+          <label for="hexInput">Hex</label>
+          <input id="hexInput" type="text" value="#2dc5ae" placeholder="#rrggbb or rrggbb" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="ctrl">
+          <label for="size">Size px</label>
+          <input id="size" type="number" value="200" min="10" max="4096" step="10" />
+        </div>
+        <div class="ctrl">
+          <label for="scale">Export scale</label>
+          <select id="scale">
+            <option value="1">1x</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+            <option value="4">4x</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="ctrl">
+          <label>Border</label>
+          <div class="row-inline">
+            <input id="useBorder" type="checkbox" />
+            <label for="useBorder">Enable</label>
+            <input id="borderColor" type="color" value="#1a1a1a" />
+            <input id="borderWidth" type="number" value="0" min="0" max="64" step="1" style="max-width:100px" />
+          </div>
+        </div>
+        <div class="ctrl">
+          <label for="radius">Corner radius px</label>
+          <input id="radius" type="number" value="20" min="0" max="512" step="1" />
+        </div>
+      </div>
+      <div class="row-inline">
+        <button class="btn primary" id="btn-generate">Generate</button>
+        <button class="btn" id="btn-export">Export PNG</button>
+        <button class="btn" id="btn-add">Add to palette</button>
+        <button class="btn" id="btn-sprite">Export palette sheet</button>
+        <button class="btn" id="btn-share">Copy share URL</button>
+      </div>
+      <div class="row-inline">
+        <span class="badge" id="rgbBadge"></span>
+        <span class="badge" id="hslBadge"></span>
+        <button class="btn inline" id="copyHex">Copy HEX</button>
+        <button class="btn inline" id="copyRgb">Copy RGB</button>
+        <button class="btn inline" id="copyHsl">Copy HSL</button>
+      </div>
+      <div class="row-inline">
+        <span class="badge" id="cW"></span>
+        <span class="badge" id="cB"></span>
+      </div>
+    </section>
+
+    <!-- Preview + Variants -->
+    <section class="card preview-wrap" aria-labelledby="preview-title">
+      <h2 id="preview-title">Preview</h2>
+      <canvas id="canvas" width="200" height="200" aria-label="Color swatch preview"></canvas>
+
+      <div class="stack">
+        <h2>Tints and Shades</h2>
+        <div id="variants" class="grid"></div>
+      </div>
+
+      <div class="stack">
+        <h2>Palette</h2>
+        <div id="palette" class="grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>Built for creators. Keyboard: G to generate, E to export, A to add to palette.</div>
+  </footer>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const picker = document.getElementById('picker');
+    const hexInput = document.getElementById('hexInput');
+    const sizeInput = document.getElementById('size');
+    const scaleSelect = document.getElementById('scale');
+    const radiusInput = document.getElementById('radius');
+    const useBorder = document.getElementById('useBorder');
+    const borderColor = document.getElementById('borderColor');
+    const borderWidth = document.getElementById('borderWidth');
+
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnExport = document.getElementById('btn-export');
+    const btnAdd = document.getElementById('btn-add');
+    const btnSprite = document.getElementById('btn-sprite');
+    const btnShare = document.getElementById('btn-share');
+
+    const rgbBadge = document.getElementById('rgbBadge');
+    const hslBadge = document.getElementById('hslBadge');
+    const cW = document.getElementById('cW');
+    const cB = document.getElementById('cB');
+
+    const copyHexBtn = document.getElementById('copyHex');
+    const copyRgbBtn = document.getElementById('copyRgb');
+    const copyHslBtn = document.getElementById('copyHsl');
+
+    const variantsEl = document.getElementById('variants');
+    const paletteEl = document.getElementById('palette');
+
+    let palette = loadPalette();
+
+    function clamp(n, min, max){ return Math.min(Math.max(n, min), max); }
+
+    function parseHex(hex){
+      if(!hex) return null;
+      hex = hex.trim().toLowerCase();
+      if(hex[0] === '#') hex = hex.slice(1);
+      if(hex.length === 3){ hex = hex.split('').map(c => c+c).join(''); }
+      if(!/^([0-9a-f]{6})$/.test(hex)) return null;
+      const r = parseInt(hex.slice(0,2), 16);
+      const g = parseInt(hex.slice(2,4), 16);
+      const b = parseInt(hex.slice(4,6), 16);
+      return { r, g, b, hex: '#' + hex };
+    }
+
+    function toHex({r,g,b}){
+      const h = [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+      return '#' + h;
+    }
+
+    function toRgb({r,g,b}){ return `rgb(${r}, ${g}, ${b})`; }
+
+    function toHsl({r,g,b}){
+      r/=255; g/=255; b/=255;
+      const max = Math.max(r,g,b), min = Math.min(r,g,b);
+      let h, s, l = (max+min)/2;
+      if(max===min){ h = s = 0; }
+      else {
+        const d = max - min;
+        s = l > .5 ? d/(2-max-min) : d/(max+min);
+        switch(max){
+          case r: h = (g - b) / d + (g < b ? 6 : 1); break;
+          case g: h = (b - r) / d + 3; break;
+          case b: h = (r - g) / d + 5; break;
+        }
+        h /= 6;
+      }
+      return `hsl(${Math.round(h*360)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%)`;
+    }
+
+    function relLuminance({r,g,b}){
+      const sRGB = [r,g,b].map(v=>{
+        v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+      });
+      return 0.2126*sRGB[0] + 0.7152*sRGB[1] + 0.0722*sRGB[2];
+    }
+
+    function contrastRatio(c1, c2){
+      const L1 = relLuminance(c1), L2 = relLuminance(c2);
+      const [a,b] = L1 > L2 ? [L1, L2] : [L2, L1];
+      return (a + 0.05) / (b + 0.05);
+    }
+
+    function roundedRect(ctx, x, y, w, h, r){
+      const rr = clamp(r, 0, Math.min(w,h)/2);
+      ctx.beginPath();
+      ctx.moveTo(x+rr, y);
+      ctx.arcTo(x+w, y, x+w, y+h, rr);
+      ctx.arcTo(x+w, y+h, x, y+h, rr);
+      ctx.arcTo(x, y+h, x, y, rr);
+      ctx.arcTo(x, y, x+w, y, rr);
+      ctx.closePath();
+    }
+
+    function drawSwatch(colorHex){
+      const parsed = parseHex(colorHex);
+      if(!parsed) return;
+      const size = clamp(parseInt(sizeInput.value,10)||200, 10, 4096);
+      const rad = clamp(parseInt(radiusInput.value,10)||0, 0, 512);
+      const bw = useBorder.checked ? clamp(parseInt(borderWidth.value,10)||0, 0, 64) : 0;
+      const bc = parseHex(borderColor.value)?.hex || '#000000';
+
+      canvas.width = size; canvas.height = size;
+      ctx.clearRect(0,0,size,size);
+
+      // Fill
+      roundedRect(ctx, bw/2, bw/2, size-bw, size-bw, rad);
+      ctx.fillStyle = parsed.hex;
+      ctx.fill();
+
+      // Border
+      if(bw>0){
+        ctx.strokeStyle = bc;
+        ctx.lineWidth = bw;
+        roundedRect(ctx, bw/2, bw/2, size-bw, size-bw, rad);
+        ctx.stroke();
+      }
+
+      // Badges
+      rgbBadge.textContent = toRgb(parsed);
+      hslBadge.textContent = toHsl(parsed);
+
+      // Contrast info
+      const white = {r:255,g:255,b:255};
+      const black = {r:0,g:0,b:0};
+      const cWv = contrastRatio(parsed, white);
+      const cBv = contrastRatio(parsed, black);
+      const fmt = v => v.toFixed(2) + ':1';
+      const tag = v => v>=7 ? 'AAA' : v>=4.5 ? 'AA' : v>=3 ? 'AA Large' : 'Fail';
+      cW.textContent = `on White ${fmt(cWv)} • ${tag(cWv)}`;
+      cB.textContent = `on Black ${fmt(cBv)} • ${tag(cBv)}`;
+      cW.className = 'badge ' + (cWv>=3 ? 'ok' : 'fail');
+      cB.className = 'badge ' + (cBv>=3 ? 'ok' : 'fail');
+
+      // Generate variants
+      renderVariants(parsed);
+    }
+
+    function lerp(a,b,t){ return Math.round(a + (b-a)*t); }
+    function mix(c1, c2, t){
+      return { r: lerp(c1.r,c2.r,t), g: lerp(c1.g,c2.g,t), b: lerp(c1.b,c2.b,t) };
+    }
+
+    function renderVariants(base){
+      variantsEl.innerHTML = '';
+      const steps = [0.85, 0.7, 0.5, 0.3, 0.15];
+      const white = {r:255,g:255,b:255};
+      const black = {r:0,g:0,b:0};
+      const variants = [];
+      steps.forEach(t=> variants.push(mix(base, white, t)) ); // tints
+      variants.push(base);
+      steps.forEach(t=> variants.push(mix(base, black, t)) ); // shades
+      variants.forEach(c=> variantsEl.appendChild(makeSwatchCard(c)));
+    }
+
+    function makeSwatchCard(color){
+      const hex = toHex(color);
+      const card = document.createElement('div');
+      card.className = 'swatch-card';
+      const top = document.createElement('div');
+      top.className = 'swatch-top';
+      top.style.background = hex;
+      card.appendChild(top);
+      const body = document.createElement('div');
+      body.className = 'swatch-body';
+      const code = document.createElement('div');
+      code.className = 'mono';
+      code.textContent = `${hex}`;
+      const row = document.createElement('div');
+      row.className = 'row-inline';
+      const btn = document.createElement('button');
+      btn.className = 'btn inline';
+      btn.textContent = 'Copy HEX';
+      btn.onclick = ()=> copy(hex);
+      const exp = document.createElement('button');
+      exp.className = 'btn inline';
+      exp.textContent = 'Export';
+      exp.onclick = ()=> exportPng(hex);
+      row.appendChild(btn); row.appendChild(exp);
+      body.appendChild(code); body.appendChild(row);
+      card.appendChild(body);
+      return card;
+    }
+
+    function copy(text){
+      navigator.clipboard.writeText(text).catch(()=>{});
+    }
+
+    function exportPng(hex){
+      // Draw at export scale to avoid blurring
+      const size = clamp(parseInt(sizeInput.value,10)||200, 10, 4096);
+      const scale = parseInt(scaleSelect.value,10) || 1;
+      const rad = clamp(parseInt(radiusInput.value,10)||0, 0, 512) * scale;
+      const bw = useBorder.checked ? clamp(parseInt(borderWidth.value,10)||0, 0, 64) * scale : 0;
+      const bc = parseHex(borderColor.value)?.hex || '#000000';
+
+      const tmp = document.createElement('canvas');
+      const tctx = tmp.getContext('2d');
+      tmp.width = size * scale; tmp.height = size * scale;
+
+      roundedRect(tctx, bw/2, bw/2, tmp.width-bw, tmp.height-bw, rad);
+      tctx.fillStyle = hex; tctx.fill();
+      if(bw>0){
+        tctx.strokeStyle = bc; tctx.lineWidth = bw;
+        roundedRect(tctx, bw/2, bw/2, tmp.width-bw, tmp.height-bw, rad);
+        tctx.stroke();
+      }
+
+      const a = document.createElement('a');
+      const cleanHex = hex.replace('#','');
+      a.download = `swatch-${cleanHex}-${size}px@${scale}x.png`;
+      a.href = tmp.toDataURL('image/png');
+      a.click();
+    }
+
+    function syncFromPicker(){ hexInput.value = picker.value.toLowerCase(); drawSwatch(picker.value); saveHash(); }
+    function syncFromHex(){
+      const parsed = parseHex(hexInput.value);
+      if(parsed){ picker.value = parsed.hex; drawSwatch(parsed.hex); saveHash(); }
+    }
+
+    function saveHash(){
+      const params = new URLSearchParams();
+      params.set('c', picker.value.replace('#',''));
+      params.set('s', sizeInput.value);
+      params.set('r', radiusInput.value);
+      params.set('b', useBorder.checked ? 1 : 0);
+      if(useBorder.checked){
+        params.set('bc', borderColor.value.replace('#',''));
+        params.set('bw', borderWidth.value);
+      }
+      history.replaceState(null, '', '#' + params.toString());
+    }
+
+    function loadFromHash(){
+      const hash = location.hash.slice(1);
+      if(!hash) return;
+      const p = new URLSearchParams(hash);
+      const c = parseHex(p.get('c'))?.hex; if(c){ picker.value = c; hexInput.value = c; }
+      const s = parseInt(p.get('s'),10); if(s) sizeInput.value = s;
+      const r = parseInt(p.get('r'),10); if(Number.isFinite(r)) radiusInput.value = r;
+      const b = p.get('b') === '1'; useBorder.checked = b;
+      const bc = parseHex(p.get('bc'))?.hex; if(bc) borderColor.value = bc;
+      const bw = parseInt(p.get('bw'),10); if(Number.isFinite(bw)) borderWidth.value = bw;
+    }
+
+    function loadPalette(){
+      try { return JSON.parse(localStorage.getItem('swatch_palette')||'[]'); } catch { return []; }
+    }
+    function savePalette(){ localStorage.setItem('swatch_palette', JSON.stringify(palette)); }
+
+    function renderPalette(){
+      paletteEl.innerHTML = '';
+      palette.forEach(hex=>{
+        const card = makeSwatchCard(parseHex(hex));
+        const body = card.querySelector('.swatch-body');
+        const actions = document.createElement('div');
+        actions.className = 'row-inline';
+        const rm = document.createElement('button'); rm.className = 'btn inline'; rm.textContent = 'Remove';
+        rm.onclick = ()=>{ palette = palette.filter(c=>c!==hex); savePalette(); renderPalette(); };
+        const use = document.createElement('button'); use.className = 'btn inline'; use.textContent = 'Use';
+        use.onclick = ()=>{ picker.value = hex; hexInput.value = hex; drawSwatch(hex); saveHash(); };
+        actions.appendChild(rm); actions.appendChild(use); body.appendChild(actions);
+        paletteEl.appendChild(card);
+      });
+    }
+
+    function exportSpriteSheet(){
+      if(palette.length === 0){ alert('Palette is empty'); return; }
+      const cell = clamp(parseInt(sizeInput.value,10)||200, 10, 4096);
+      const cols = Math.min(8, Math.max(1, Math.ceil(Math.sqrt(palette.length))));
+      const rows = Math.ceil(palette.length / cols);
+      const sheet = document.createElement('canvas');
+      sheet.width = cols * cell; sheet.height = rows * cell;
+      const sctx = sheet.getContext('2d');
+      palette.forEach((hex, i)=>{
+        const x = (i % cols) * cell; const y = Math.floor(i / cols) * cell;
+        sctx.fillStyle = hex; sctx.fillRect(x, y, cell, cell);
+      });
+      const a = document.createElement('a');
+      a.download = `palette-${palette.length}-${cell}px.png`;
+      a.href = sheet.toDataURL('image/png');
+      a.click();
+    }
+
+    // Events
+    picker.addEventListener('input', syncFromPicker);
+    hexInput.addEventListener('input', syncFromHex);
+    sizeInput.addEventListener('change', ()=>{ drawSwatch(picker.value); saveHash(); });
+    radiusInput.addEventListener('change', ()=>{ drawSwatch(picker.value); saveHash(); });
+    useBorder.addEventListener('change', ()=>{ drawSwatch(picker.value); saveHash(); });
+    borderColor.addEventListener('input', ()=>{ if(useBorder.checked) { drawSwatch(picker.value); saveHash(); } });
+    borderWidth.addEventListener('input', ()=>{ if(useBorder.checked) { drawSwatch(picker.value); saveHash(); } });
+
+    btnGenerate.addEventListener('click', ()=> drawSwatch(picker.value));
+    btnExport.addEventListener('click', ()=> exportPng(picker.value));
+    btnAdd.addEventListener('click', ()=>{
+      const hex = picker.value.toLowerCase();
+      if(!palette.includes(hex)) palette.push(hex);
+      savePalette(); renderPalette();
+    });
+    btnSprite.addEventListener('click', exportSpriteSheet);
+    btnShare.addEventListener('click', ()=>{ saveHash(); copy(location.href); btnShare.textContent = 'Copied'; setTimeout(()=> btnShare.textContent='Copy share URL', 1000); });
+
+    copyHexBtn.addEventListener('click', ()=> copy(picker.value.toLowerCase()));
+    copyRgbBtn.addEventListener('click', ()=>{ const c=parseHex(picker.value); if(c) copy(toRgb(c)); });
+    copyHslBtn.addEventListener('click', ()=>{ const c=parseHex(picker.value); if(c) copy(toHsl(c)); });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if(e.key==='g' || e.key==='G'){ e.preventDefault(); drawSwatch(picker.value); }
+      if(e.key==='e' || e.key==='E'){ e.preventDefault(); exportPng(picker.value); }
+      if(e.key==='a' || e.key==='A'){ e.preventDefault(); btnAdd.click(); }
+    });
+
+    // Init
+    loadFromHash();
+    drawSwatch(picker.value);
+    renderPalette();
+  </script>
+</body>
+</html>

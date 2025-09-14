@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Veil of Ignorance: Trolley Problem — Game</title>
+<style>
+  :root{
+    --bg:#0f1220;         /* deep night */
+    --panel:#161a2e;      /* card bg */
+    --panel-2:#1e2340;    /* accents */
+    --text:#e7ecff;       /* main text */
+    --muted:#a7b0d6;      /* secondary text */
+    --accent:#7aa2ff;     /* primary action */
+    --accent-2:#74f3c6;   /* success */
+    --danger:#ff6b6b;     /* fail */
+    --warn:#ffd166;       /* warn */
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,sans-serif;
+    background: radial-gradient(1200px 600px at 80% -20%, #1a1f3c 0%, #0e1120 60%, #0b0d18 100%);
+    color:var(--text);
+    display:flex; flex-direction:column; gap:12px;
+  }
+
+  header{
+    padding:14px 18px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{font-weight:800; letter-spacing:.3px}
+  .brand small{ display:block; color:var(--muted); font-weight:600; letter-spacing:.4px }
+
+  main{ display:grid; grid-template-columns: 360px 1fr; gap:14px; padding:0 18px 18px; width:100%; max-width:1200px; margin:0 auto; }
+  @media (max-width: 980px){ main{ grid-template-columns: 1fr; } }
+
+  .card{ background:linear-gradient(180deg, var(--panel), var(--panel-2)); border:1px solid #2a315b; border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .card h2{ margin:0 0 10px; font-size:18px; }
+  .pad{ padding:16px; }
+
+  .controls{ display:flex; flex-direction:column; gap:12px; }
+  .row{ display:flex; align-items:center; gap:8px; }
+  label{ color:var(--muted); font-size:13px; }
+  input[type="number"], select { width:100%; padding:10px 12px; color:var(--text); background:#12162a; border:1px solid #2c3568; border-radius:12px; }
+  input[type="checkbox"]{ transform:scale(1.2); }
+
+  .btn{ user-select:none; cursor:pointer; border:1px solid transparent; color:#0b0e18; background:var(--accent); font-weight:800; padding:10px 14px; border-radius:12px; text-align:center; transition:.15s transform,.15s filter; }
+  .btn:active{ transform:translateY(1px) }
+  .btn.secondary{ background:transparent; color:var(--text); border-color:#2c3568 }
+  .btn.warn{ background:var(--warn); }
+  .btn.danger{ background:var(--danger); color:#170d0d; }
+  .stack{ display:flex; gap:8px; flex-wrap:wrap; }
+
+  /* Canvas area */
+  #stage{ position:relative; aspect-ratio: 16/9; width:100%; background:
+     radial-gradient(800px 400px at 20% -10%, rgba(122,162,255,.12), transparent 60%),
+     linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
+    border-radius:18px; overflow:hidden;
+    border:1px solid #2a315b;
+  }
+  svg{ width:100%; height:100%; display:block; }
+
+  .hud{ position:absolute; inset:auto 12px 12px 12px; display:flex; align-items:center; justify-content:space-between; pointer-events:none; }
+  .pill{ background:#11162b; border:1px solid #2b3360; border-radius:999px; padding:8px 12px; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:10px; pointer-events:auto; }
+  .pill strong{ color:var(--text) }
+  .hud .stack .btn{ pointer-events:auto; }
+
+  /* Outcome banner */
+  .banner{ position:absolute; left:50%; top:14px; transform:translateX(-50%); padding:10px 16px; border-radius:999px; border:1px solid #2c3568; background:#0e1430dd; backdrop-filter: blur(6px); font-weight:800; letter-spacing:.3px; display:none; }
+  .banner.show{ display:inline-flex; }
+
+  /* Simple animations */
+  .pulse{ animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 0%{ filter:brightness(1) } 50%{ filter:brightness(1.35) } 100%{ filter:brightness(1) } }
+  .shake{ animation:shake .4s linear 2; }
+  @keyframes shake{ 0%{ transform:translate(0) }25%{ transform:translate(-2px,1px)}50%{ transform:translate(2px,-1px)}75%{transform:translate(-1px,-1px)}100%{ transform:translate(0)} }
+
+  .small{ font-size:12px; color:var(--muted); }
+  .stat{ display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; font-size:14px; }
+  .stat .bar{ height:6px; background:#0f1533; border:1px solid #2b3360; border-radius:999px; overflow:hidden }
+  .stat .bar > i{ display:block; height:100%; background:linear-gradient(90deg,var(--accent),#9dc2ff); width:0%; }
+  .divider{ height:1px; background:#263065; margin:8px 0; }
+  .kbd{ display:inline-flex; align-items:center; justify-content:center; min-width:28px; padding:3px 8px; font-weight:800; border-radius:6px; border:1px solid #303a6c; background:#0e1430; color:var(--text) }
+
+  details{ border:1px solid #2a315b; border-radius:12px; background:#101633 }
+  details summary{ cursor:pointer; padding:10px 12px; font-weight:700; }
+  details .pad{ border-top:1px solid #2a315b }
+
+  a{ color:var(--accent-2); text-decoration:none }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div>Veil of Ignorance: <span style="color:var(--accent)">Trolley Game</span></div>
+      <small>Choose the rule before you know who you are.</small>
+    </div>
+    <div class="stack">
+      <button id="newRoundBtn" class="btn">New Round</button>
+      <button id="resetBtn" class="btn secondary">Reset Stats</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left column: settings & stats -->
+    <section class="card pad" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">Rules & Settings</h2>
+      <div class="controls">
+        <div class="row" title="Number of people tied to the main track (where the trolley currently goes)">
+          <label style="min-width:160px">Main track victims</label>
+          <input id="mainCount" type="number" min="0" value="5" />
+        </div>
+        <div class="row" title="Number of people tied to the side track (if you pull the lever, the trolley diverts here)">
+          <label style="min-width:160px">Side track victims</label>
+          <input id="sideCount" type="number" min="0" value="1" />
+        </div>
+        <div class="row" title="Equal chance to be any tied person. If off, weight by group size (same result in this model, kept for future variants)">
+          <input id="equalChance" type="checkbox" checked />
+          <label for="equalChance">Equal chance among all tied people</label>
+        </div>
+        <div class="row" title="When enabled, the game hides which person you are until AFTER you choose.">
+          <input id="veilMode" type="checkbox" checked />
+          <label for="veilMode">Veil of ignorance (hidden identity)</label>
+        </div>
+        <details>
+          <summary>Advanced (visuals, timing, accessibility)</summary>
+          <div class="pad" style="display:grid; gap:10px">
+            <div class="row"><label style="min-width:160px">Decision timer (seconds)</label>
+              <input id="timerSec" type="number" min="0" value="8" />
+            </div>
+            <div class="row"><label style="min-width:160px">Animation speed (1–5)</label>
+              <input id="speed" type="number" min="1" max="5" value="3" />
+            </div>
+            <div class="small">Keyboard: <span class="kbd">P</span> Pull Lever, <span class="kbd">D</span> Do Nothing, <span class="kbd">N</span> New Round, <span class="kbd">R</span> Reset</div>
+          </div>
+        </details>
+
+        <div class="divider"></div>
+        <div>
+          <h2 style="margin:0 0 6px">Your Outcomes</h2>
+          <div class="stat" aria-live="polite">
+            <div>Rounds</div>
+            <div class="bar"><i id="barRounds" style="width:0%"></i></div>
+            <div><strong id="rounds">0</strong></div>
+          </div>
+          <div class="stat" aria-live="polite">
+            <div>Survival rate</div>
+            <div class="bar"><i id="barSurvival" style="width:0%"></i></div>
+            <div><strong id="survival">0%</strong></div>
+          </div>
+          <div class="stat" aria-live="polite">
+            <div>Total lives saved</div>
+            <div class="bar"><i id="barSaved" style="width:0%"></i></div>
+            <div><strong id="saved">0</strong></div>
+          </div>
+          <div class="small" style="margin-top:6px">Lives saved = (larger group − smaller group) for rounds where your choice avoided the larger casualty count.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right column: game board -->
+    <section class="card" style="position:relative">
+      <div id="stage" role="group" aria-label="Trolley track and people">
+        <div id="banner" class="banner" aria-live="assertive"></div>
+        <!-- Heads-up display -->
+        <div class="hud">
+          <div class="pill" id="statusPill"><span>Identity:</span> <strong id="identity">Hidden</strong></div>
+          <div class="stack">
+            <button id="leverBtn" class="btn">Pull Lever (<span class="kbd">P</span>)</button>
+            <button id="stayBtn" class="btn secondary">Do Nothing (<span class="kbd">D</span>)</button>
+          </div>
+        </div>
+
+        <!-- SVG Scene -->
+        <svg id="scene" viewBox="0 0 1280 720" aria-hidden="true">
+          <!-- ground -->
+          <defs>
+            <linearGradient id="gTrack" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stop-color="#9aa7ff" stop-opacity=".7"/>
+              <stop offset="1" stop-color="#7083d6" stop-opacity=".7"/>
+            </linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="b"/>
+              <feMerge>
+                <feMergeNode in="b"/><feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          <!-- Tracks -->
+          <g id="tracks" stroke="url(#gTrack)" stroke-width="12" fill="none">
+            <path id="mainTrack" d="M60,430 C300,420 560,420 1220,420"/>
+            <path id="branch" d="M560,420 Q690,420 740,360 T1220,300"/>
+            <!-- sleepers -->
+            <g id="sleepers" stroke-width="6" stroke="#5460a3" opacity=".65"></g>
+            <!-- junction arm -->
+            <line id="switch" x1="560" y1="420" x2="610" y2="405" stroke="#a6b3ff" stroke-width="10" stroke-linecap="round" filter="url(#glow)"/>
+          </g>
+
+          <!-- Trolley -->
+          <g id="trolley" transform="translate(120,380)">
+            <rect x="-60" y="-30" width="120" height="60" rx="10" fill="#c2ccff" stroke="#6c79c9" stroke-width="6"/>
+            <rect x="-35" y="-18" width="30" height="20" rx="3" fill="#91a1ff"/>
+            <rect x="5" y="-18" width="30" height="20" rx="3" fill="#91a1ff"/>
+            <circle cx="-30" cy="33" r="12" fill="#6c79c9"/>
+            <circle cx="30" cy="33" r="12" fill="#6c79c9"/>
+          </g>
+
+          <!-- People groups -->
+          <g id="groupMain" transform="translate(980,420)"></g>
+          <g id="groupSide" transform="translate(980,300)"></g>
+
+          <!-- Lever person -->
+          <g id="leverPerson" transform="translate(520,370)">
+            <circle r="12" fill="#ffd166" stroke="#b78f2a" stroke-width="4"/>
+            <line x1="0" y1="12" x2="0" y2="36" stroke="#ffd166" stroke-width="6"/>
+            <line x1="0" y1="22" x2="-12" y2="34" stroke="#ffd166" stroke-width="6"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="pad" style="display:grid; gap:8px">
+        <div class="small">Goal: choose a global rule <em>before</em> you know who you are. After you decide, the game randomly assigns you to one of the tied people and plays out the outcome.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pad small" style="opacity:.9; text-align:center">
+    Built with pure HTML/CSS/JS. No libraries. — Tip: try many rounds and compare your survival rate with and without pulling.
+  </footer>
+
+<script>
+(function(){
+  const qs = sel => document.querySelector(sel);
+  const qsa = sel => Array.from(document.querySelectorAll(sel));
+
+  // Controls
+  const mainCountEl = qs('#mainCount');
+  const sideCountEl = qs('#sideCount');
+  const equalChanceEl = qs('#equalChance');
+  const veilModeEl = qs('#veilMode');
+  const timerSecEl = qs('#timerSec');
+  const speedEl = qs('#speed');
+
+  const leverBtn = qs('#leverBtn');
+  const stayBtn = qs('#stayBtn');
+  const newRoundBtn = qs('#newRoundBtn');
+  const resetBtn = qs('#resetBtn');
+
+  const identityEl = qs('#identity');
+  const banner = qs('#banner');
+
+  const roundsEl = qs('#rounds');
+  const survivalEl = qs('#survival');
+  const savedEl = qs('#saved');
+  const barRounds = qs('#barRounds');
+  const barSurvival = qs('#barSurvival');
+  const barSaved = qs('#barSaved');
+
+  // Scene elements
+  const scene = qs('#scene');
+  const sleepers = qs('#sleepers');
+  const switchArm = qs('#switch');
+  const trolley = qs('#trolley');
+  const groupMain = qs('#groupMain');
+  const groupSide = qs('#groupSide');
+
+  // State
+  let round = 0, survived = 0, livesSaved = 0;
+  let decision = null; // 'pull' | 'stay'
+  let timer = null; let timeLeft = 0;
+  let myIndex = null; // which person (global index over victims)
+  let totalVictims = 0;
+
+  const rnd = (n=1)=>Math.random()*n;
+
+  // Build sleepers (ties) along track
+  function buildSleepers(){
+    sleepers.innerHTML='';
+    const gaps = 34;
+    for(let i=0;i<26;i++){
+      const x = 80 + i*gaps;
+      sleepers.insertAdjacentHTML('beforeend', `<line x1="${x}" y1="402" x2="${x+10}" y2="438"/>`);
+    }
+  }
+
+  // Build a group of people as simple stick icons with ? heads until revealed
+  function buildGroup(g, count){
+    g.innerHTML = '';
+    const spacing = 36;
+    for(let i=0;i<count;i++){
+      const dx = i*spacing;
+      g.insertAdjacentHTML('beforeend', personSVG(dx));
+    }
+  }
+  function personSVG(dx){
+    return `<g class="person" transform="translate(${dx},0)" data-state="hidden">
+      <circle r="10" cx="0" cy="-22" fill="#c9d2ff" stroke="#6e7ad0" stroke-width="4"/>
+      <text x="0" y="-18" text-anchor="middle" font-size="14" fill="#0d1230" font-weight="900">?</text>
+      <line x1="0" y1="-12" x2="0" y2="18" stroke="#c9d2ff" stroke-width="6"/>
+      <line x1="0" y1="0" x2="-12" y2="18" stroke="#c9d2ff" stroke-width="6"/>
+      <line x1="0" y1="0" x2="12" y2="18" stroke="#c9d2ff" stroke-width="6"/>
+    </g>`;
+  }
+
+  function updateSceneFromInputs(){
+    const mainN = clamp(+mainCountEl.value,0,99);
+    const sideN = clamp(+sideCountEl.value,0,99);
+    mainCountEl.value = mainN; sideCountEl.value = sideN;
+    buildGroup(groupMain, mainN);
+    buildGroup(groupSide, sideN);
+    totalVictims = mainN + sideN;
+    switchArm.setAttribute('transform','');
+    identityEl.textContent = veilModeEl.checked ? 'Hidden' : '—';
+  }
+
+  // Utility
+  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+
+  function showBanner(msg, tone=''){
+    banner.textContent = msg;
+    banner.className = 'banner show ' + tone;
+    setTimeout(()=> banner.className = 'banner', 2500);
+  }
+
+  function setLeverPulled(pulled){
+    switchArm.setAttribute('x2', pulled? '590':'610');
+    switchArm.setAttribute('y2', pulled? '380':'405');
+  }
+
+  // Start a round
+  function newRound(){
+    clearInterval(timer); timer = null; decision=null; myIndex=null; timeLeft=0;
+    setLeverPulled(false);
+    updateSceneFromInputs();
+    banner.className='banner';
+    const t = clamp(+timerSecEl.value,0,99); timeLeft=t;
+    if(t>0){ showBanner('Decide: Pull or Do Nothing ('+t+'s)', ''); countdown(); }
+    else { showBanner('Decide: Pull or Do Nothing'); }
+  }
+
+  function countdown(){
+    const pill = qs('#statusPill');
+    pill.classList.add('pulse');
+    timer = setInterval(()=>{
+      timeLeft--; if(timeLeft<=0){ clearInterval(timer); pill.classList.remove('pulse'); if(!decision){ decide('stay'); } }
+      else {
+        showBanner('Decide: '+timeLeft+'s left');
+      }
+    },1000);
+  }
+
+  function decide(kind){
+    if(decision) return; // lock first choice
+    decision = kind; // 'pull' or 'stay'
+    leverBtn.classList.toggle('shake', kind==='pull');
+    setLeverPulled(kind==='pull');
+
+    // Draw my identity under the veil
+    const mainN = +mainCountEl.value; const sideN = +sideCountEl.value;
+    totalVictims = mainN + sideN;
+    if(totalVictims===0){ showBanner('No one on the tracks. Everyone lives!',''); round++; updateStats(true,0,true); animateRun(kind,false); return; }
+
+    const pool = [];
+    for(let i=0;i<mainN;i++) pool.push({track:'main', idx:i});
+    for(let i=0;i<sideN;i++) pool.push({track:'side', idx:i});
+
+    // Equal chance among all tied people, so uniform over pool
+    myIndex = Math.floor(rnd(pool.length));
+    const me = pool[myIndex];
+
+    // Reveal visually which one I am
+    const g = (me.track==='main'? groupMain:groupSide).children[me.idx];
+    if(g){
+      const head = g.querySelector('circle');
+      const label = g.querySelector('text');
+      head.setAttribute('fill', '#74f3c6');
+      head.setAttribute('stroke', '#34b790');
+      label.textContent = 'YOU';
+    }
+    identityEl.textContent = veilModeEl.checked? 'Revealed: '+me.track.toUpperCase()+' track' : '—';
+
+    // Determine casualties
+    const goesTo = (kind==='pull')? 'side':'main';
+    const casualties = (goesTo==='main')? mainN : sideN;
+    const avoided = (goesTo==='main')? sideN : mainN;
+
+    // Survive if I'm not on the hit track
+    const survivedRound = (me.track !== goesTo);
+    const savedThisRound = Math.max(0, avoided - casualties); // (people spared) - (people hit) but only positive when truly saving more
+
+    round++;
+
+    animateRun(kind, !survivedRound);
+    updateStats(survivedRound, savedThisRound, false);
+
+    const msg = survivedRound ? 'You survived this round.' : 'You were on the hit track.';
+    const tone = survivedRound ? '' : 'danger';
+    setTimeout(()=> showBanner(msg, tone), 900);
+  }
+
+  function updateStats(survivedRound, savedThisRound, trivialAllLive){
+    if(survivedRound) survived++;
+    if(savedThisRound>0) livesSaved += savedThisRound;
+
+    roundsEl.textContent = round;
+    survivalEl.textContent = (round? Math.round((survived/round)*100):0)+"%";
+    savedEl.textContent = livesSaved;
+
+    barRounds.style.width = Math.min(100, round*4) + '%';
+    barSurvival.style.width = (round? (survived/round)*100:0) + '%';
+    // normalize saved bar roughly by groups up to 50
+    barSaved.style.width = Math.min(100, (livesSaved/50)*100) + '%';
+
+    if(trivialAllLive) showBanner('Trivial round: no one was on the tracks.');
+  }
+
+  // Animate the trolley run toward the chosen track
+  function animateRun(kind, hitMe){
+    const speed = clamp(+speedEl.value,1,5); // 1 slow .. 5 fast
+    const dur = 2400 - (speed-1)*400; // ms
+
+    // Start at x=120 along main track
+    const from = 120; const to = (kind==='pull')? 1220 : 1220; // end x always reaches end; path choice is visual via y tween
+    const yMain = 380; const ySide = 260; // approximate body of trolley positions vs tracks
+
+    trolley.style.transition = `transform ${dur}ms cubic-bezier(.2,.9,.2,1)`;
+
+    if(kind==='pull'){
+      // curve upward first, then to side track height
+      trolley.style.transform = `translate(740px,320px)`; // mid curve
+      setTimeout(()=>{
+        trolley.style.transform = `translate(${to}px,${ySide}px)`;
+      }, Math.max(180,dur*0.35));
+    }else{
+      trolley.style.transform = `translate(${to}px,${yMain}px)`;
+    }
+
+    // Flash casualties
+    setTimeout(()=>{
+      const targetGroup = (kind==='pull')? groupSide : groupMain;
+      qsa('#groupMain .person, #groupSide .person').forEach(p=>p.classList.remove('shake'));
+      targetGroup.querySelectorAll('.person').forEach((p,i)=>{
+        setTimeout(()=>{
+          p.classList.add('shake');
+          const head = p.querySelector('circle');
+          head.setAttribute('fill', '#ff9aa8'); head.setAttribute('stroke', '#d45b6b');
+          const label = p.querySelector('text'); if(label.textContent==='?') label.textContent='X';
+        }, i*80);
+      });
+    }, dur-300);
+  }
+
+  function resetStats(){ round=0; survived=0; livesSaved=0; updateStats(false,0,false); showBanner('Stats reset'); }
+
+  // Event listeners
+  leverBtn.addEventListener('click', ()=> decide('pull'));
+  stayBtn.addEventListener('click', ()=> decide('stay'));
+  newRoundBtn.addEventListener('click', newRound);
+  resetBtn.addEventListener('click', resetStats);
+  [mainCountEl, sideCountEl, equalChanceEl, veilModeEl].forEach(el=> el.addEventListener('change', updateSceneFromInputs));
+
+  document.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    if(k==='p') decide('pull');
+    else if(k==='d') decide('stay');
+    else if(k==='n') newRound();
+    else if(k==='r') resetStats();
+  });
+
+  // Init scene
+  buildSleepers();
+  updateSceneFromInputs();
+  newRound();
+})();
+</script>
+</body>
+</html>

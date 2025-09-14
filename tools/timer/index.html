@@ -4,145 +4,424 @@
   <meta charset="UTF-8">
   <title>Timer Overlay Generator</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #111;
-      color: white;
-      padding: 20px;
-    }
-    canvas {
-      background: transparent;
-      display: block;
-      margin: 20px auto;
-    }
-    input, select, button {
-      margin: 4px;
-      padding: 6px;
-      font-size: 16px;
-    }
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, sans-serif; background:#111; color:#fff; padding:20px; }
+    canvas { background:transparent; display:block; margin:16px auto; }
+    label { display:inline-block; min-width:150px; }
+    input, select, button { margin:4px; padding:6px 8px; font-size:14px; }
+    .row { margin:8px 0; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:8px; }
+    .card { border:1px solid #333; border-radius:12px; padding:12px; }
+    .muted { color:#aaa; font-size:12px; }
+    #status { margin-top:8px; color:#9aa; font-size:13px; min-height:1.2em; }
   </style>
 </head>
 <body>
   <h1>Timer Overlay Generator</h1>
 
-  <label>Start Time:</label>
-  <input type="number" id="hours" value="0" min="0"> h
-  <input type="number" id="minutes" value="0" min="0"> m
-  <input type="number" id="seconds" value="0" min="0"> s<br>
+  <div class="grid">
+    <div class="card">
+      <div class="row"><label>Start Time:</label>
+        <input type="number" id="hours" value="0" min="0" style="width:70px"> h
+        <input type="number" id="minutes" value="0" min="0" style="width:70px"> m
+        <input type="number" id="seconds" value="0" min="0" style="width:70px"> s
+      </div>
 
-  <label>Output Length (seconds):</label>
-  <input type="number" id="outputLength" value="10" min="1"><br>
+      <div class="row"><label>Output Length (seconds):</label>
+        <input type="number" id="outputLength" value="3600" min="1" style="width:120px">
+      </div>
 
-  <label>Count Direction:</label>
-  <select id="direction">
-    <option value="up">Count Up</option>
-    <option value="down">Count Down</option>
-  </select><br>
+      <div class="row"><label>Count Direction:</label>
+        <select id="direction">
+          <option value="up">Count Up</option>
+          <option value="down">Count Down</option>
+        </select>
+      </div>
 
-  <label>Font Presets:</label>
-  <select id="presetFont" onchange="document.getElementById('font').value = this.value">
-    <option value="Arial">Arial</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Impact">Impact</option>
-    <option value="Georgia">Georgia</option>
-    <option value="Verdana">Verdana</option>
-  </select><br>
+      <div class="row"><label>Display Format:</label>
+        <select id="format">
+          <option value="hms">HH:MM:SS</option>
+          <option value="ms">MM:SS</option>
+          <option value="s">SS</option>
+        </select>
+      </div>
 
-  <label>Or Custom Font:</label>
-  <input type="text" id="font" value="Arial"><br>
+      <div class="row"><label>FPS:</label>
+        <input type="number" id="fps" value="2" min="1" max="60" style="width:80px">
+        <span class="muted">2–3 is ideal for long timers</span>
+      </div>
+    </div>
 
-  <label>Font Size (px):</label>
-  <input type="number" id="fontSize" value="100" min="10"><br>
+    <div class="card">
+      <div class="row"><label>Font Preset:</label>
+        <select id="presetFont" onchange="document.getElementById('font').value = this.value">
+          <option value="Arial">Arial</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Impact">Impact</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Verdana">Verdana</option>
+        </select>
+      </div>
 
-  <label>Text Color:</label>
-  <input type="color" id="fontColor" value="#ffffff"><br>
+      <div class="row"><label>Custom Font:</label>
+        <input type="text" id="font" value="Arial" style="width:180px">
+      </div>
 
-  <label>Display Format:</label>
-  <select id="format">
-    <option value="hms">HH:MM:SS</option>
-    <option value="ms">MM:SS</option>
-    <option value="s">SS</option>
-  </select><br>
+      <div class="row"><label>Font Size (px):</label>
+        <input type="number" id="fontSize" value="160" min="10" style="width:120px">
+      </div>
 
-  <button onclick="exportVideo()">Generate & Export</button>
+      <div class="row"><label>Text Color:</label>
+        <input type="color" id="fontColor" value="#ffffff">
+      </div>
 
-  <canvas id="timerCanvas" width="800" height="200"></canvas>
+      <div class="row"><label>Stroke:</label>
+        <input type="checkbox" id="useStroke" checked>
+        <input type="color" id="strokeColor" value="#000000">
+        <input type="number" id="strokeWidth" value="8" min="0" style="width:80px"> px
+      </div>
 
-  <script>
-    const canvas = document.getElementById('timerCanvas');
-    const ctx = canvas.getContext('2d', { alpha: true });
+      <div class="row"><label>Shadow:</label>
+        <input type="checkbox" id="useShadow">
+        <input type="color" id="shadowColor" value="#000000">
+        <input type="number" id="shadowBlur" value="0" min="0" style="width:80px"> blur
+      </div>
+    </div>
 
-    let recorder, recordedChunks = [];
+    <div class="card">
+      <div class="row"><label>Canvas Width:</label>
+        <input type="number" id="cw" value="1600" min="16" style="width:120px">
+      </div>
+      <div class="row"><label>Canvas Height:</label>
+        <input type="number" id="ch" value="400" min="16" style="width:120px">
+      </div>
+      <div class="row"><label>Fast Export Chunk (min):</label>
+        <input type="number" id="chunkMins" value="10" min="1" style="width:120px">
+      </div>
+      <div class="row"><label>Bitrate (kbps):</label>
+        <input type="number" id="kbps" value="1200" min="200" style="width:120px">
+      </div>
+      <div class="row"><span class="muted">Background is transparent by default.</span></div>
+    </div>
+  </div>
 
-    function formatTime(seconds, format) {
-      seconds = Math.max(0, Math.floor(seconds));
-      const h = Math.floor(seconds / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      const s = seconds % 60;
+  <div class="row">
+    <button onclick="exportRealtimeAccurate()">Accurate Duration (Realtime)</button>
+    <button onclick="exportFastSegmented()">Fast Export (WebCodecs, Segmented)</button>
+  </div>
 
-      switch (format) {
-        case 'hms':
-          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        case 'ms':
-          return `${String(m + h * 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        case 's':
-          return String(h * 3600 + m * 60 + s).padStart(2, '0');
-      }
+  <div id="status"></div>
+
+  <canvas id="timerCanvas" width="1600" height="400"></canvas>
+
+<script>
+/* -------------------- Canvas + drawing -------------------- */
+const canvas = document.getElementById('timerCanvas');
+const ctx = canvas.getContext('2d', { alpha: true });
+const statusEl = document.getElementById('status');
+
+function getInputs() {
+  const hrs = +document.getElementById('hours').value || 0;
+  const mins = +document.getElementById('minutes').value || 0;
+  const secs = +document.getElementById('seconds').value || 0;
+  const format = document.getElementById('format').value;
+  const direction = document.getElementById('direction').value;
+  const outputLength = +document.getElementById('outputLength').value || 10;
+  const font = document.getElementById('font').value;
+  const fontSize = +document.getElementById('fontSize').value || 100;
+  const fontColor = document.getElementById('fontColor').value;
+  const useStroke = document.getElementById('useStroke').checked;
+  const strokeColor = document.getElementById('strokeColor').value;
+  const strokeWidth = +document.getElementById('strokeWidth').value || 0;
+  const useShadow = document.getElementById('useShadow').checked;
+  const shadowColor = document.getElementById('shadowColor').value;
+  const shadowBlur = +document.getElementById('shadowBlur').value || 0;
+  const fps = Math.min(Math.max(+document.getElementById('fps').value || 2, 1), 60);
+  const cw = Math.max(+document.getElementById('cw').value || 1600, 16);
+  const ch = Math.max(+document.getElementById('ch').value || 400, 16);
+  const chunkMins = Math.max(+document.getElementById('chunkMins').value || 10, 1);
+  const kbps = Math.max(+document.getElementById('kbps').value || 1200, 200);
+  const startValue = hrs*3600 + mins*60 + secs;
+  return {format, direction, outputLength, font, fontSize, fontColor, useStroke, strokeColor, strokeWidth, useShadow, shadowColor, shadowBlur, fps, cw, ch, chunkMins, kbps, startValue};
+}
+
+function formatTime(seconds, format) {
+  seconds = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (format === 'hms') return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  if (format === 'ms')  return `${String(m + h*60).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return String(h*3600 + m*60 + s).padStart(2,'0');
+}
+
+function applyCanvasSize(w,h){
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+  }
+}
+
+function drawTime(text, s){
+  const {font, fontSize, fontColor, useStroke, strokeColor, strokeWidth, useShadow, shadowColor, shadowBlur} = s;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.font = `${fontSize}px '${font}'`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (useShadow) {
+    ctx.shadowColor = shadowColor;
+    ctx.shadowBlur = shadowBlur;
+  } else {
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+  }
+
+  if (useStroke && strokeWidth > 0) {
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = strokeColor;
+    ctx.strokeText(text, canvas.width/2, canvas.height/2);
+  }
+
+  ctx.fillStyle = fontColor;
+  ctx.fillText(text, canvas.width/2, canvas.height/2);
+  ctx.restore();
+}
+
+/* -------------------- Accurate Duration (Realtime) -------------------- */
+async function exportRealtimeAccurate(){
+  const s = getInputs();
+  applyCanvasSize(s.cw, s.ch);
+
+  // Prepare save
+  if (!('showSaveFilePicker' in window)) {
+    alert('Open this page over HTTPS in Chrome/Edge to save directly to disk.');
+    return;
+  }
+  const handle = await window.showSaveFilePicker({
+    suggestedName: 'timer_realtime.webm',
+    types: [{ description:'WebM Video', accept:{ 'video/webm':['.webm'] } }]
+  });
+  const writer = await handle.createWritable();
+
+  // Set up MediaRecorder on canvas stream
+  const stream = canvas.captureStream(s.fps);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ?
+    'video/webm;codecs=vp9' : 'video/webm;codecs=vp8';
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: s.kbps*1000 });
+
+  let done; const doneP = new Promise(r => done = r);
+  rec.ondataavailable = async e => { if (e.data && e.data.size) await writer.write(e.data); };
+  rec.onstop = async () => { try { await writer.close(); } catch{}; done(); };
+  rec.start(2000); // flush every 2s
+
+  statusEl.textContent = 'Recording in real time…';
+  const totalFrames = Math.round(s.outputLength * s.fps);
+  const frameDurMs = 1000 / s.fps;
+  const t0 = performance.now();
+  for (let i=0; i<totalFrames; i++){
+    const target = (i+1)*frameDurMs;
+    const elapsed = performance.now() - t0;
+    if (target > elapsed) await new Promise(r => setTimeout(r, target - elapsed));
+
+    const t = i / s.fps;
+    const timeValue = s.direction==='up' ? s.startValue + t : s.startValue - t;
+    drawTime(formatTime(timeValue, s.format), s);
+
+    if ((i % (s.fps*5)) === 0) statusEl.textContent = `Recording… ${Math.floor(i/s.fps)}s / ${s.outputLength}s`;
+  }
+
+  rec.stop();
+  await doneP;
+  statusEl.textContent = 'Realtime export complete.';
+}
+
+/* -------------------- Fast Export (WebCodecs, segmented) -------------------- */
+/* A minimal, standards-compliant WebM writer that:
+   - Uses TimecodeScale = 1_000_000 ns (1ms ticks)
+   - Writes Clusters with ms timecodes
+   - Uses SimpleBlock with VINT track number
+   - Streams each chunk to disk (no RAM blow-up)
+*/
+class WebMMuxerStream {
+  constructor(writer, { width, height, codec='V_VP9' }) {
+    this.w = writer;
+    this.width = width; this.height = height;
+    this.codec = codec; // 'V_VP9' | 'V_VP8'
+    this.clusterStartMs = 0;
+    this.clusterPieces = [];
+    this.clusterOpen = false;
+    this.headerWritten = false;
+  }
+  _u8(...a){ return new Uint8Array(a); }
+  _txt(s){ return new TextEncoder().encode(s); }
+  _concat(arrs){ let n=0; for(const a of arrs) n+=a.length; const out=new Uint8Array(n); let o=0; for(const a of arrs){ out.set(a,o); o+=a.length; } return out; }
+  _beUint(v){ const b=[]; let n=v; do{ b.unshift(n&0xFF); n>>>=8; } while(n>0); return new Uint8Array(b.length?b:[0]); }
+  _vsize(n){ for(let L=1;L<=8;L++){ const max=(1<<(7*L))-1; if(n<=max){ const out=new Uint8Array(L); out[0]=1<<(8-L); let x=n; for(let i=L-1;i>=0;i--){ out[i]|=x&0xFF; x>>>=8; } return out; } } throw new Error('size big'); }
+  _elm(id, payload){ return this._concat([ new Uint8Array(id), this._vsize(payload.length), payload ]); }
+  _uElm(id, num){ return this._elm(id, this._beUint(num)); }
+  _sElm(id, str){ return this._elm(id, this._txt(str)); }
+
+  async writeHeader(){
+    if (this.headerWritten) return;
+    const EBML = this._elm([0x1A,0x45,0xDF,0xA3], this._concat([
+      this._uElm([0x42,0x86],1), this._uElm([0x42,0xF7],1),
+      this._uElm([0x42,0xF2],4), this._uElm([0x42,0xF3],8),
+      this._sElm([0x42,0x82],'webm'),
+      this._uElm([0x42,0x87],2), this._uElm([0x42,0x85],2)
+    ]));
+    const SegmentID = new Uint8Array([0x18,0x53,0x80,0x67]);
+    const UnknownSize = new Uint8Array([0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF]);
+    const Info = this._elm([0x15,0x49,0xA9,0x66], this._concat([
+      this._uElm([0x2A,0xD7,0xB1], 1_000_000), // TimecodeScale: 1ms
+      this._sElm([0x4D,0x80],'Timer Overlay'),
+      this._sElm([0x57,0x41],'Timer Overlay')
+    ]));
+    const Video = this._elm([0xE0], this._concat([
+      this._uElm([0xB0], this.width),
+      this._uElm([0xBA], this.height)
+    ]));
+    const TrackEntry = this._elm([0xAE], this._concat([
+      this._uElm([0xD7], 1),              // TrackNumber
+      this._uElm([0x73,0xC5], 1),         // TrackUID
+      this._uElm([0x83], 1),              // TrackType (video)
+      this._sElm([0x86], this.codec),     // Codec ID
+      Video
+    ]));
+    const Tracks = this._elm([0x16,0x54,0xAE,0x6B], TrackEntry);
+
+    await this.w.write(EBML);
+    await this.w.write(SegmentID);
+    await this.w.write(UnknownSize);
+    await this.w.write(Info);
+    await this.w.write(Tracks);
+
+    this.headerWritten = true;
+  }
+
+  async _startCluster(ms){
+    this.clusterPieces = [];
+    this.clusterStartMs = ms;
+    const timecode = this._uElm([0xE7], ms); // Cluster timecode in ms
+    this.clusterPieces.push(timecode);
+    this.clusterOpen = true;
+  }
+
+  _simpleBlock(trackNo, relMs, key, frameBytes){
+    // VINT track number (0x81 for track 1), signed int16 timecode, flags
+    const dv = new DataView(new ArrayBuffer(2));
+    dv.setInt16(0, relMs, false);
+    const trackVint = (trackNo>=1 && trackNo<=127) ? new Uint8Array([0x80 | trackNo]) : (()=>{ throw new Error('track range'); })();
+    const header = new Uint8Array(trackVint.length + 2 + 1);
+    header.set(trackVint,0);
+    header[trackVint.length+0] = dv.getUint8(0);
+    header[trackVint.length+1] = dv.getUint8(1);
+    header[trackVint.length+2] = key ? 0x80 : 0x00; // keyframe, no lacing
+    const payload = new Uint8Array(header.length + frameBytes.length);
+    payload.set(header,0); payload.set(frameBytes, header.length);
+    return this._elm([0xA3], payload); // SimpleBlock
+  }
+
+  async addChunk({ bytes, timestampMs, keyframe }){
+    if (!this.clusterOpen || (timestampMs - this.clusterStartMs) > 5000) {
+      if (this.clusterOpen) await this._flushCluster();
+      await this._startCluster(timestampMs);
+    }
+    const rel = timestampMs - this.clusterStartMs;
+    this.clusterPieces.push(this._simpleBlock(1, rel, keyframe, bytes));
+  }
+
+  async _flushCluster(){
+    const payload = this._concat(this.clusterPieces);
+    const cluster = this._elm([0x1F,0x43,0xB6,0x75], payload);
+    await this.w.write(cluster);
+    this.clusterOpen = false;
+    this.clusterPieces = [];
+  }
+
+  async finalize(){
+    if (this.clusterOpen) await this._flushCluster();
+    await this.w.close();
+  }
+}
+
+async function exportFastSegmented(){
+  const s = getInputs();
+  applyCanvasSize(s.cw, s.ch);
+
+  if (!('VideoEncoder' in window)) { alert('WebCodecs not available. Use Realtime.'); return; }
+  if (!('showSaveFilePicker' in window)) { alert('Use Chrome/Edge over HTTPS.'); return; }
+
+  statusEl.textContent = 'Fast export starting…';
+
+  const totalFrames = Math.round(s.outputLength * s.fps);
+  const frameDurUs   = Math.round(1_000_000 / s.fps);
+  const framesPerChunk = Math.round(s.chunkMins * 60 * s.fps);
+
+  // Pick codec string supported by your browser
+  let codecStr = 'vp09.00.10.08'; // VP9 profile 0
+  try {
+    const ok = await VideoEncoder.isConfigSupported({ codec: codecStr, width: canvas.width, height: canvas.height, framerate: s.fps });
+    if (!ok.supported) codecStr = 'vp8';
+  } catch { codecStr = 'vp8'; }
+  const muxCodecId = (codecStr === 'vp8') ? 'V_VP8' : 'V_VP9';
+
+  let frameIndex = 0, fileIndex = 0;
+  while (frameIndex < totalFrames) {
+    const framesThisChunk = Math.min(framesPerChunk, totalFrames - frameIndex);
+
+    // Save path for this chunk
+    const handle = await window.showSaveFilePicker({
+      suggestedName: `timer_${String(fileIndex).padStart(3,'0')}.webm`,
+      types: [{ description: 'WebM Video', accept: { 'video/webm': ['.webm'] } }]
+    });
+    const writer = await handle.createWritable();
+    const mux = new WebMMuxerStream(writer, { width: canvas.width, height: canvas.height, codec: muxCodecId });
+    await mux.writeHeader();
+
+    // Encoder
+    const encoder = new VideoEncoder({
+      output: async ({ chunk, timestamp, type }) => {
+        const bytes = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(bytes);
+        const ms = Math.round(timestamp / 1000); // µs -> ms
+        await mux.addChunk({ bytes, timestampMs: ms, keyframe: (type === 'key') });
+      },
+      error: e => console.error('Encoder error:', e)
+    });
+    await encoder.configure({
+      codec: codecStr,
+      width: canvas.width,
+      height: canvas.height,
+      bitrate: s.kbps * 1000,
+      framerate: s.fps
+    });
+
+    statusEl.textContent = `Encoding chunk ${fileIndex+1}…`;
+    for (let i=0; i<framesThisChunk; i++, frameIndex++){
+      const t = frameIndex / s.fps;
+      const timeValue = s.direction==='up' ? s.startValue + t : s.startValue - t;
+      drawTime(formatTime(timeValue, s.format), s);
+
+      const vf = new VideoFrame(canvas, { timestamp: frameIndex * frameDurUs });
+      encoder.encode(vf, { keyFrame: (frameIndex===0) });
+      vf.close();
+
+      if ((i % (s.fps*10)) === 0) await new Promise(r => setTimeout(r, 0));
     }
 
-    function drawTime(text, font, fontSize, fontColor) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = fontColor;
-      ctx.font = `${fontSize}px '${font}'`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    }
+    await encoder.flush();
+    await mux.finalize();
+    fileIndex++;
+    statusEl.textContent = `Saved timer_${String(fileIndex-1).padStart(3,'0')}.webm`;
+  }
 
-    async function exportVideo() {
-      const hrs = parseInt(document.getElementById('hours').value) || 0;
-      const mins = parseInt(document.getElementById('minutes').value) || 0;
-      const secs = parseInt(document.getElementById('seconds').value) || 0;
-      const format = document.getElementById('format').value;
-      const direction = document.getElementById('direction').value;
-      const outputLength = parseInt(document.getElementById('outputLength').value) || 10;
-      const font = document.getElementById('font').value;
-      const fontSize = parseInt(document.getElementById('fontSize').value) || 100;
-      const fontColor = document.getElementById('fontColor').value;
+  statusEl.textContent = 'Fast export complete.';
+}
 
-      let startValue = hrs * 3600 + mins * 60 + secs;
-
-      const fps = 60;
-      const totalFrames = outputLength * fps;
-
-      const stream = canvas.captureStream(fps);
-      recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-      recordedChunks = [];
-
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'timer.webm';
-        a.click();
-      };
-
-      recorder.start();
-
-      for (let frame = 0; frame < totalFrames; frame++) {
-        const t = frame / fps;
-        let timeValue = direction === 'up' ? startValue + t : startValue - t;
-        drawTime(formatTime(timeValue, format), font, fontSize, fontColor);
-        await new Promise(r => setTimeout(r, 1000 / fps));
-      }
-
-      recorder.stop();
-    }
-  </script>
+/* -------------------- Button name shims -------------------- */
+window.exportVideo = exportRealtimeAccurate;     // original name fallback
+window.exportFast = exportFastSegmented;
+</script>
 </body>
 </html>
