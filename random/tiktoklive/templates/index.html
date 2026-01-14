@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Lyrics</title>
+  <style>
+    body {
+      font-family: 'Arial Black', sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 1em;
+    }
+    h1 {
+      color: #0ff;
+      text-align: center;
+    }
+    .stanza {
+      margin: 1em 0;
+      padding: 1em;
+      background: #222;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .stanza:hover {
+      background: #333;
+    }
+    .sung {
+      opacity: 0.4;
+      text-decoration: line-through;
+    }
+    .username {
+      font-weight: bold;
+      color: #ff4081;
+      display: block;
+      margin-bottom: 0.3em;
+    }
+    .comment {
+      font-style: italic;
+      color: #aaa;
+      display: block;
+      margin-bottom: 0.5em;
+    }
+    .lyrics {
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎤 Live Lyrics</h1>
+  <div id="lyrics"></div>
+
+  <script>
+    async function fetchLyrics() {
+      let res = await fetch("/lyrics");
+      let data = await res.json();
+      let container = document.getElementById("lyrics");
+      container.innerHTML = "";
+      data.forEach((lyric, i) => {
+        let div = document.createElement("div");
+        div.className = "stanza" + (lyric.sung ? " sung" : "");
+
+        // username
+        let user = document.createElement("span");
+        user.className = "username";
+        user.textContent = lyric.user || "Anonymous";
+
+        // comment
+        let comment = document.createElement("span");
+        comment.className = "comment";
+        if (lyric.comment) {
+          comment.textContent = `"${lyric.comment}"`;
+        }
+
+        // actual stanza
+        let lines = document.createElement("div");
+        lines.className = "lyrics";
+        lines.textContent = lyric.text;
+
+        div.appendChild(user);
+        div.appendChild(comment);
+        div.appendChild(lines);
+
+        // click to mark sung
+        div.onclick = async () => {
+          await fetch("/mark_sung", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({index: i})
+          });
+          fetchLyrics();
+        };
+
+        container.appendChild(div);
+      });
+    }
+
+    setInterval(fetchLyrics, 2000);
+    fetchLyrics();
+  </script>
+</body>
+</html>

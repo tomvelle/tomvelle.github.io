@@ -39,11 +39,13 @@
       </div>
 
       <div class="row"><label>Display Format:</label>
-        <select id="format">
-          <option value="hms">HH:MM:SS</option>
-          <option value="ms">MM:SS</option>
-          <option value="s">SS</option>
-        </select>
+<select id="format">
+  <option value="hms">HH:MM:SS</option>
+  <option value="hmsms">HH:MM:SS.mmm</option>
+  <option value="ms">MM:SS</option>
+  <option value="msms">MM:SS.mmm</option>
+  <option value="s">SS</option>
+</select>
       </div>
 
       <div class="row"><label>FPS:</label>
@@ -145,14 +147,28 @@ function getInputs() {
   return {format, direction, outputLength, font, fontSize, fontColor, useStroke, strokeColor, strokeWidth, useShadow, shadowColor, shadowBlur, fps, cw, ch, chunkMins, kbps, startValue};
 }
 
-function formatTime(seconds, format) {
-  seconds = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (format === 'hms') return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  if (format === 'ms')  return `${String(m + h*60).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return String(h*3600 + m*60 + s).padStart(2,'0');
+function formatTime(secondsFloat, format) {
+  const totalMs = Math.max(0, Math.floor(secondsFloat * 1000));
+  const ms = totalMs % 1000;
+  const totalSeconds = Math.floor(totalMs / 1000);
+
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  if (format === 'hms')
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+  if (format === 'hmsms')
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+
+  if (format === 'ms')
+    return `${String(m + h*60).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+  if (format === 'msms')
+    return `${String(m + h*60).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
+
+  return String(totalSeconds);
 }
 
 function applyCanvasSize(w,h){
@@ -399,7 +415,7 @@ async function exportFastSegmented(){
 
     statusEl.textContent = `Encoding chunk ${fileIndex+1}…`;
     for (let i=0; i<framesThisChunk; i++, frameIndex++){
-      const t = frameIndex / s.fps;
+      const t = frameIndex * (1 / s.fps);
       const timeValue = s.direction==='up' ? s.startValue + t : s.startValue - t;
       drawTime(formatTime(timeValue, s.format), s);
 
