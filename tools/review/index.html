@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rubric Row Feedback</title>
+</head>
+<body>
+  <h1>Rubric Row Feedback</h1>
+
+  <p>Paste your rows (TSV recommended) and click Parse. Your feedback is saved locally in this browser.</p>
+
+  <textarea id="input" rows="10" cols="120" placeholder="Paste rows here (tab-separated is best)"></textarea>
+  <br />
+  <button id="parseBtn">Parse</button>
+  <button id="saveBtn">Save</button>
+  <button id="loadBtn">Load Saved</button>
+  <button id="clearBtn">Clear Saved</button>
+  <button id="exportBtn">Export CSV</button>
+
+  <hr />
+
+  <div id="status"></div>
+
+  <div id="tableWrap"></div>
+
+<script>
+(function () {
+  const LS_KEY = "rubric_feedback_v1";
+
+  const els = {
+    input: document.getElementById("input"),
+    parseBtn: document.getElementById("parseBtn"),
+    saveBtn: document.getElementById("saveBtn"),
+    loadBtn: document.getElementById("loadBtn"),
+    clearBtn: document.getElementById("clearBtn"),
+    exportBtn: document.getElementById("exportBtn"),
+    status: document.getElementById("status"),
+    tableWrap: document.getElementById("tableWrap"),
+  };
+
+  /** In-memory model:
+   * {
+   *   rows: [{
+   *     id, tag, description, weight, rationality, dep,
+   *     fb: {
+   *       tag: { verdict: "good"|"bad", why: "" },
+   *       description: { verdict, why },
+   *       weight: { verdict, why, corrected: "major"|"minor" },
+   *       rationality: { verdict, why }
+   *     }
+   *   }]
+   * }
+   */
+  let model = { rows: [] };
+
+  function setStatus(msg) {
+    els.status.textContent = msg || "";
+  }
+
+  function safeTrim(s) {
+    return (s == null) ? "" : String(s).trim();
+  }
+
+  function splitLine(line) {
+    // Prefer tabs. Fallback to 2+ spaces.
+    let parts = line.split(/\t+/).map(safeTrim).filter(x => x !== "");
+    if (parts.length < 5) {
+      parts = line.split(/ {2,}/).map(safeTrim).filter(x => x !== "");
+    }
+    return parts;
+  }
+
+  function parseInput(text) {
+    const lines = String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n")
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    const rows = [];
+
+    for (const line of lines) {
+      const parts = splitLine(line);
+
+      // Expected minimum: id tag description weight rationality
+      // dep is optional (last).
+      if (parts.length < 5) continue;
+
+      const id = safeTrim(parts[0]);
+      const tag = safeTrim(parts[1]);
+      const weight = safeTrim(parts[3]).toLowerCase();
+      const rationality = safeTrim(parts[4]);
+
+      // Description can contain separators if the paste was not strict TSV.
+      // If we have more than 6 parts, join the middle into description.
+      // Layout: 0 id, 1 tag, 2 description, 3 weight, 4 rationality, 5 dep (optional)
+      let description = safeTrim(parts[2]);
+      let dep = safeTrim(parts[5] || "");
+
+      if (parts.length > 6) {
+        // Join parts[2..parts.length-3] as description,
+        // keep last 2 as rationality + dep if possible.
+        // But rationality is already parts[4] for normal TSV, so only do this when input is messy.
+        // We will assume: id tag [description...] weight rationality [dep]
+        const last = parts[parts.length - 1];
+        const secondLast = parts[parts.length - 2];
+        const thirdLast = parts[parts.length - 3];
+
+        // Try to detect weight at thirdLast
+        const w = (thirdLast || "").toLowerCase();
+        if (w === "major" || w === "minor") {
+          description = parts.slice(2, parts.length - 3).join(" ");
+          dep = last;
+          // rationality becomes secondLast
+          // weight becomes thirdLast
+          // tag stays parts[1]
+          // id stays parts[0]
+          // overwrite:
+          // (we already stored weight and rationality earlier, so reassign local vars style)
+          // easiest: rebuild row below using these new values
+          const row = makeRow({
+            id,
+            tag,
+            description,
+            weight: w,
+            rationality: secondLast,
+            dep
+          });
+          rows.push(row);
+          continue;
+        }
+      }
+
+      const row = makeRow({ id, tag, description, weight, rationality, dep });
+      rows.push(row);
+    }
+
+    return rows;
+  }
+
+  function makeRow({ id, tag, description, weight, rationality, dep }) {
+    const w = (String(weight || "").toLowerCase() === "minor") ? "minor" : "major";
+    return {
+      id: safeTrim(id),
+      tag: safeTrim(tag),
+      description: safeTrim(description),
+      weight: w,
+      rationality: safeTrim(rationality),
+      dep: safeTrim(dep),
+      fb: {
+        tag: { verdict: "good", why: "" },
+        description: { verdict: "good", why: "" },
+        weight: { verdict: "good", why: "", corrected: w },
+        rationality: { verdict: "good", why: "" },
+      }
+    };
+  }
+
+  function escapeCsv(v) {
+    const s = String(v == null ? "" : v);
+    const needs = /[",\n]/.test(s);
+    const doubled = s.replace(/"/g, '""');
+    return needs ? `"${doubled}"` : doubled;
+  }
+
+  function download(filename, text) {
+    const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function render() {
+    if (!model.rows.length) {
+      els.tableWrap.innerHTML = "";
+      return;
+    }
+
+    const table = document.createElement("table");
+    table.border = "1";
+    table.cellPadding = "6";
+    table.style.borderCollapse = "collapse";
+    table.style.width = "100%";
+
+    const thead = document.createElement("thead");
+    const hr = document.createElement("tr");
+    [
+      "id", "tag", "description", "weight", "rationality", "dep",
+      "tag fb", "tag why",
+      "desc fb", "desc why",
+      "weight fb", "weight why", "weight corrected",
+      "rational fb", "rational why"
+    ].forEach(h => {
+      const th = document.createElement("th");
+      th.textContent = h;
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    model.rows.forEach((row, idx) => {
+      const tr = document.createElement("tr");
+
+      function tdText(v) {
+        const td = document.createElement("td");
+        td.textContent = v;
+        return td;
+      }
+
+      tr.appendChild(tdText(row.id));
+      tr.appendChild(tdText(row.tag));
+      tr.appendChild(tdText(row.description));
+      tr.appendChild(tdText(row.weight));
+      tr.appendChild(tdText(row.rationality));
+      tr.appendChild(tdText(row.dep));
+
+      tr.appendChild(tdVerdictSelect(idx, "tag"));
+      tr.appendChild(tdWhyInput(idx, "tag"));
+
+      tr.appendChild(tdVerdictSelect(idx, "description"));
+      tr.appendChild(tdWhyInput(idx, "description"));
+
+      tr.appendChild(tdVerdictSelect(idx, "weight"));
+      tr.appendChild(tdWhyInput(idx, "weight"));
+      tr.appendChild(tdWeightCorrected(idx));
+
+      tr.appendChild(tdVerdictSelect(idx, "rationality"));
+      tr.appendChild(tdWhyInput(idx, "rationality"));
+
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    els.tableWrap.innerHTML = "";
+    els.tableWrap.appendChild(table);
+  }
+
+  function tdVerdictSelect(rowIndex, field) {
+    const td = document.createElement("td");
+    const sel = document.createElement("select");
+    const optGood = document.createElement("option");
+    optGood.value = "good";
+    optGood.textContent = "good";
+    const optBad = document.createElement("option");
+    optBad.value = "bad";
+    optBad.textContent = "bad";
+    sel.appendChild(optGood);
+    sel.appendChild(optBad);
+
+    sel.value = model.rows[rowIndex].fb[field].verdict;
+
+    sel.addEventListener("change", () => {
+      model.rows[rowIndex].fb[field].verdict = sel.value;
+      autoSave();
+    });
+
+    td.appendChild(sel);
+    return td;
+  }
+
+  function tdWhyInput(rowIndex, field) {
+    const td = document.createElement("td");
+    const ta = document.createElement("textarea");
+    ta.rows = 2;
+    ta.cols = 24;
+    ta.placeholder = "why";
+    ta.value = model.rows[rowIndex].fb[field].why || "";
+
+    ta.addEventListener("input", () => {
+      model.rows[rowIndex].fb[field].why = ta.value;
+      autoSave();
+    });
+
+    td.appendChild(ta);
+    return td;
+  }
+
+  function tdWeightCorrected(rowIndex) {
+    const td = document.createElement("td");
+    const sel = document.createElement("select");
+
+    const optMajor = document.createElement("option");
+    optMajor.value = "major";
+    optMajor.textContent = "major";
+    const optMinor = document.createElement("option");
+    optMinor.value = "minor";
+    optMinor.textContent = "minor";
+
+    sel.appendChild(optMajor);
+    sel.appendChild(optMinor);
+
+    sel.value = model.rows[rowIndex].fb.weight.corrected || model.rows[rowIndex].weight;
+
+    sel.addEventListener("change", () => {
+      model.rows[rowIndex].fb.weight.corrected = sel.value;
+      autoSave();
+    });
+
+    td.appendChild(sel);
+    return td;
+  }
+
+  function saveToLocalStorage() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(model));
+      setStatus("Saved locally.");
+    } catch (e) {
+      setStatus("Save failed: " + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  function autoSave() {
+    // Quiet autosave, no status spam.
+    try { localStorage.setItem(LS_KEY, JSON.stringify(model)); } catch (_) {}
+  }
+
+  function loadFromLocalStorage() {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) {
+      setStatus("No saved data found.");
+      return;
+    }
+    try {
+      const loaded = JSON.parse(raw);
+      if (!loaded || !Array.isArray(loaded.rows)) {
+        setStatus("Saved data is invalid.");
+        return;
+      }
+      model = loaded;
+      setStatus("Loaded saved data.");
+      render();
+    } catch (e) {
+      setStatus("Load failed: " + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  function clearLocalStorage() {
+    localStorage.removeItem(LS_KEY);
+    setStatus("Cleared saved data.");
+  }
+
+  function exportCsv() {
+    if (!model.rows.length) {
+      setStatus("Nothing to export.");
+      return;
+    }
+
+    const headers = [
+      "id","tag","description","weight","rationality","dep",
+      "tag_verdict","tag_why",
+      "description_verdict","description_why",
+      "weight_verdict","weight_why","weight_corrected",
+      "rationality_verdict","rationality_why"
+    ];
+
+    const lines = [headers.map(escapeCsv).join(",")];
+
+    for (const r of model.rows) {
+      const row = [
+        r.id, r.tag, r.description, r.weight, r.rationality, r.dep,
+        r.fb.tag.verdict, r.fb.tag.why,
+        r.fb.description.verdict, r.fb.description.why,
+        r.fb.weight.verdict, r.fb.weight.why, r.fb.weight.corrected,
+        r.fb.rationality.verdict, r.fb.rationality.why
+      ];
+      lines.push(row.map(escapeCsv).join(","));
+    }
+
+    download("rubric_feedback.csv", lines.join("\n"));
+    setStatus("Exported CSV.");
+  }
+
+  els.parseBtn.addEventListener("click", () => {
+    const rows = parseInput(els.input.value);
+
+    if (!rows.length) {
+      model = { rows: [] };
+      render();
+      setStatus("No rows parsed. Paste tab-separated rows (TSV) for best results.");
+      return;
+    }
+
+    // Try to merge with existing saved feedback by id if present.
+    const existingById = new Map();
+    for (const r of model.rows) existingById.set(r.id, r);
+
+    const merged = rows.map(r => {
+      const old = existingById.get(r.id);
+      if (!old) return r;
+
+      // Keep new base fields but preserve feedback.
+      r.fb = old.fb || r.fb;
+      // If weight changed, keep corrected as-is but default to new weight if missing.
+      if (!r.fb.weight) r.fb.weight = { verdict: "good", why: "", corrected: r.weight };
+      if (!r.fb.weight.corrected) r.fb.weight.corrected = r.weight;
+      return r;
+    });
+
+    model = { rows: merged };
+    render();
+    autoSave();
+    setStatus("Parsed " + merged.length + " rows.");
+  });
+
+  els.saveBtn.addEventListener("click", saveToLocalStorage);
+  els.loadBtn.addEventListener("click", loadFromLocalStorage);
+  els.clearBtn.addEventListener("click", clearLocalStorage);
+  els.exportBtn.addEventListener("click", exportCsv);
+
+  // Auto-load on open if present
+  loadFromLocalStorage();
+})();
+</script>
+</body>
+</html>

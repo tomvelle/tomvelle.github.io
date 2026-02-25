@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Border Overlay Generator</title>
+  <style>
+    :root { --bg:#0f1115; --panel:#151925; --text:#e9eef7; --muted:#9aa6bf; --line:#2a3144; }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b0d12, #0f1115);
+      color: var(--text);
+    }
+    header {
+      padding: 14px 18px; border-bottom: 1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    }
+    header h1 { margin:0; font-size:16px; font-weight:650; }
+    header .sub { color:var(--muted); font-size:12px; }
+    .wrap { display:grid; grid-template-columns: 360px 1fr; gap:0; min-height: calc(100vh - 52px); }
+    .panel {
+      background: rgba(21,25,37,.92);
+      border-right: 1px solid var(--line);
+      padding: 14px;
+      overflow:auto;
+    }
+    .panel h2 { margin: 14px 0 8px; font-size:13px; color:#cfe0ff; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .field { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+    .field label { font-size:12px; color: var(--muted); }
+    input, select, button, textarea {
+      border: 1px solid var(--line);
+      background: #0f1320;
+      color: var(--text);
+      padding: 9px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    input[type="color"] { padding: 0; height: 36px; }
+    input[type="range"] { padding: 0; }
+    .btnrow { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+    button {
+      cursor:pointer;
+      background: #1b2440;
+      border-color:#2b3a66;
+      font-weight: 600;
+    }
+    button.secondary { background:#0f1320; border-color: var(--line); font-weight:600; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .stage {
+      display:flex; align-items:center; justify-content:center;
+      padding: 18px;
+    }
+    .canvaswrap {
+      position:relative;
+      padding: 12px;
+      border-radius: 18px;
+      background: #0b0e17;
+      border: 1px solid var(--line);
+      box-shadow: 0 12px 50px rgba(0,0,0,.35);
+    }
+    .checker {
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,.09) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.09) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.09) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.09) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+      border-radius: 14px;
+      padding: 10px;
+    }
+    canvas { display:block; border-radius: 12px; }
+    .note { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color:#c9d6f2; }
+    .tiny { font-size:11px; color: var(--muted); }
+    .pill {
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 6px 10px; border:1px solid var(--line); border-radius:999px;
+      background:#0f1320;
+      color:#cfe0ff;
+      font-size:12px;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Border Overlay Generator</h1>
+    <div class="sub">Transparent PNG, WebM (VP9 alpha), optional GIF</div>
+  </div>
+  <div class="pill"><span id="statusDot">●</span><span id="statusText">Ready</span></div>
+</header>
+
+<div class="wrap">
+  <aside class="panel">
+    <h2>Canvas size</h2>
+    <div class="field">
+      <label>Preset</label>
+      <select id="preset">
+        <option value="9:16">9:16 (Shorts, TikTok)</option>
+        <option value="16:9">16:9 (YouTube)</option>
+        <option value="4:3">4:3</option>
+        <option value="1:1">1:1</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Width (px)</label>
+        <input id="w" type="number" min="16" step="1" value="1080" />
+      </div>
+      <div class="field">
+        <label>Height (px)</label>
+        <input id="h" type="number" min="16" step="1" value="1920" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Ratio (custom, like 3:2)</label>
+        <input id="ratio" class="mono" type="text" value="9:16" />
+      </div>
+      <div class="field">
+        <label>Lock ratio</label>
+        <select id="lockRatio">
+          <option value="on" selected>On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+    </div>
+
+    <h2>Border</h2>
+    <div class="row">
+      <div class="field">
+        <label>Thickness (px)</label>
+        <input id="thickness" type="number" min="0" step="1" value="80" />
+      </div>
+      <div class="field">
+        <label>Corner radius (px)</label>
+        <input id="radius" type="number" min="0" step="1" value="40" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Border style</label>
+        <select id="borderStyle">
+          <option value="solid" selected>Solid</option>
+          <option value="double">Double</option>
+          <option value="dashed">Dashed</option>
+          <option value="neon">Glow</option>
+          <option value="gradient">Gradient</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Color</label>
+        <input id="color" type="color" value="#ffffff" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Opacity</label>
+        <input id="opacity" type="range" min="0" max="100" value="100" />
+        <div class="tiny"><span id="opacityLabel">100</span>%</div>
+      </div>
+      <div class="field">
+        <label>Second color (gradient)</label>
+        <input id="color2" type="color" value="#00e5ff" />
+      </div>
+    </div>
+
+    <h2>Safe zones (optional)</h2>
+    <div class="row">
+      <div class="field">
+        <label>Show safe guides</label>
+        <select id="safeOn">
+          <option value="off" selected>Off</option>
+          <option value="on">On</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Guide opacity</label>
+        <input id="safeOpacity" type="range" min="0" max="100" value="35" />
+        <div class="tiny"><span id="safeOpacityLabel">35</span>%</div>
+      </div>
+    </div>
+    <div class="note">
+      Guides are typical social safe areas. Adjust to taste. Export includes them only if enabled.
+    </div>
+
+    <h2>Label (optional)</h2>
+    <div class="row">
+      <div class="field">
+        <label>Text</label>
+        <input id="labelText" type="text" placeholder="Your text" value="" />
+      </div>
+      <div class="field">
+        <label>Font size (px)</label>
+        <input id="labelSize" type="number" min="6" step="1" value="64" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Position</label>
+        <select id="labelPos">
+          <option value="top" selected>Top</option>
+          <option value="bottom">Bottom</option>
+          <option value="center">Center</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Text color</label>
+        <input id="labelColor" type="color" value="#ffffff" />
+      </div>
+    </div>
+
+    <h2>Animation (optional)</h2>
+    <div class="row">
+      <div class="field">
+        <label>Animated border</label>
+        <select id="animOn">
+          <option value="off" selected>Off</option>
+          <option value="on">On</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Speed</label>
+        <input id="animSpeed" type="range" min="0" max="100" value="35" />
+        <div class="tiny"><span id="animSpeedLabel">35</span></div>
+      </div>
+    </div>
+
+    <h2>Export</h2>
+    <div class="row">
+      <div class="field">
+        <label>File name</label>
+        <input id="filename" class="mono" type="text" value="border-overlay" />
+      </div>
+      <div class="field">
+        <label>Scale</label>
+        <select id="scale">
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>FPS (animation export)</label>
+        <input id="fps" type="number" min="1" step="1" value="30" />
+      </div>
+      <div class="field">
+        <label>Duration (seconds)</label>
+        <input id="duration" type="number" min="1" step="1" value="3" />
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button id="btnPng">Export PNG</button>
+      <button id="btnWebm">Export WebM (transparent)</button>
+      <button id="btnGif" class="secondary">Export GIF (optional)</button>
+    </div>
+
+    <div class="note" style="margin-top:10px">
+      WebM export uses <span class="mono">MediaRecorder</span> with VP9. If your browser does not keep alpha, you will get a black background.
+      GIF export loads a small library from a CDN and GIF transparency is limited.
+    </div>
+
+    <div class="btnrow">
+      <button id="btnCopySettings" class="secondary">Copy settings JSON</button>
+      <button id="btnPasteSettings" class="secondary">Paste settings JSON</button>
+      <button id="btnReset" class="secondary">Reset</button>
+    </div>
+
+    <textarea id="settingsBox" rows="4" placeholder="Settings JSON will appear here"></textarea>
+    <div class="tiny">Tip: Paste settings between projects to keep a consistent border style.</div>
+  </aside>
+
+  <main class="stage">
+    <div class="canvaswrap">
+      <div class="checker">
+        <canvas id="c" width="1080" height="1920"></canvas>
+      </div>
+      <div class="tiny" style="margin-top:10px">
+        Preview is on a checkerboard to show transparency. The exported overlay is transparent outside your border and shapes.
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Optional GIF export library (loaded only when needed) -->
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const canvas = $("c");
+  const ctx = canvas.getContext("2d");
+
+  const statusDot = $("statusDot");
+  const statusText = $("statusText");
+
+  function setStatus(text, ok=true) {
+    statusText.textContent = text;
+    statusDot.style.color = ok ? "#47ff9a" : "#ff6b6b";
+  }
+
+  function parseRatio(str) {
+    const m = String(str).trim().match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+    if (!m) return null;
+    const a = Number(m[1]), b = Number(m[2]);
+    if (!isFinite(a) || !isFinite(b) || a <= 0 || b <= 0) return null;
+    return { a, b };
+  }
+
+  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+  function rgba(hex, alpha01) {
+    const h = hex.replace("#","").trim();
+    const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    return `rgba(${r},${g},${b},${alpha01})`;
+  }
+
+  function applyPreset(preset) {
+    let ratio = preset;
+    if (preset === "custom") ratio = $("ratio").value || "9:16";
+    $("ratio").value = ratio;
+
+    const r = parseRatio(ratio);
+    if (!r) return;
+
+    const w = Number($("w").value) || 1080;
+    const lock = $("lockRatio").value === "on";
+
+    if (lock) {
+      const h = Math.round(w * (r.b / r.a));
+      $("h").value = h;
+    }
+  }
+
+  function resizeCanvasFromInputs() {
+    const scale = Number($("scale").value) || 1;
+    const w0 = clamp(Number($("w").value) || 1080, 16, 16384);
+    const h0 = clamp(Number($("h").value) || 1920, 16, 16384);
+
+    canvas.width = Math.round(w0 * scale);
+    canvas.height = Math.round(h0 * scale);
+
+    canvas.style.width = w0 + "px";
+    canvas.style.height = h0 + "px";
+  }
+
+  function roundedRectPath(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawSafeGuides(alpha01) {
+    const W = canvas.width, H = canvas.height;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,255,255,${alpha01})`;
+    ctx.lineWidth = Math.max(2, Math.round(Math.min(W,H) * 0.002));
+    ctx.setLineDash([ctx.lineWidth * 3, ctx.lineWidth * 3]);
+
+    // Generic safe areas:
+    // outer padding: 5%
+    // top UI: 12% (common in vertical)
+    // bottom UI: 18% (common in vertical)
+    const pad = Math.round(Math.min(W,H) * 0.05);
+    const top = Math.round(H * 0.12);
+    const bottom = Math.round(H * 0.18);
+
+    // Outer box
+    ctx.strokeRect(pad, pad, W - pad * 2, H - pad * 2);
+
+    // Title safe area
+    ctx.strokeRect(pad, top, W - pad * 2, H - top - bottom);
+
+    ctx.restore();
+  }
+
+  function drawLabel(scale) {
+    const text = $("labelText").value.trim();
+    if (!text) return;
+
+    const pos = $("labelPos").value;
+    const sizePx = clamp(Number($("labelSize").value) || 64, 6, 1000) * scale;
+    const color = $("labelColor").value;
+
+    ctx.save();
+    ctx.font = `700 ${sizePx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const W = canvas.width, H = canvas.height;
+    let y = H * 0.12;
+    if (pos === "bottom") y = H * 0.88;
+    if (pos === "center") y = H * 0.5;
+
+    // subtle shadow for readability
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillText(text, W/2 + sizePx*0.03, y + sizePx*0.03);
+
+    ctx.fillStyle = rgba(color, 1);
+    ctx.fillText(text, W/2, y);
+    ctx.restore();
+  }
+
+  function drawBorder(t, timeSec=0) {
+    const scale = Number($("scale").value) || 1;
+    const thickness = clamp(Number($("thickness").value) || 0, 0, 5000) * scale;
+    const radius = clamp(Number($("radius").value) || 0, 0, 5000) * scale;
+
+    const style = $("borderStyle").value;
+    const alpha = clamp(Number($("opacity").value) / 100, 0, 1);
+
+    const W = canvas.width, H = canvas.height;
+
+    // Clear to full transparency
+    ctx.clearRect(0, 0, W, H);
+
+    if (thickness <= 0) {
+      if ($("safeOn").value === "on") drawSafeGuides(clamp(Number($("safeOpacity").value)/100,0,1));
+      drawLabel(scale);
+      return;
+    }
+
+    // We draw a filled rounded rect, then punch out the inner area using destination-out.
+    ctx.save();
+
+    // Fill style
+    if (style === "gradient") {
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, rgba($("color").value, alpha));
+      g.addColorStop(1, rgba($("color2").value, alpha));
+      ctx.fillStyle = g;
+    } else {
+      ctx.fillStyle = rgba($("color").value, alpha);
+    }
+
+    // Outer shape
+    roundedRectPath(0, 0, W, H, radius);
+    ctx.fill();
+
+    // Optional effects layered on top
+    if (style === "neon") {
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.shadowColor = rgba($("color").value, alpha);
+      ctx.shadowBlur = thickness * 0.35;
+      ctx.fillStyle = rgba($("color").value, alpha * 0.55);
+      roundedRectPath(0, 0, W, H, radius);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Punch inner hole
+    ctx.globalCompositeOperation = "destination-out";
+    roundedRectPath(thickness, thickness, W - thickness*2, H - thickness*2, Math.max(0, radius - thickness));
+    ctx.fill();
+
+    // If double border, add inner ring
+    if (style === "double") {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = rgba($("color").value, alpha);
+      const gap = Math.max(2, Math.round(thickness * 0.35));
+      const innerT = Math.max(2, Math.round(thickness * 0.22));
+
+      roundedRectPath(thickness + gap, thickness + gap, W - (thickness+gap)*2, H - (thickness+gap)*2, Math.max(0, radius - (thickness + gap)));
+      ctx.fill();
+
+      ctx.globalCompositeOperation = "destination-out";
+      roundedRectPath(thickness + gap + innerT, thickness + gap + innerT,
+        W - (thickness+gap+innerT)*2, H - (thickness+gap+innerT)*2,
+        Math.max(0, radius - (thickness + gap + innerT)));
+      ctx.fill();
+    }
+
+    // If dashed border, draw stroke dashes around outer edge
+    if (style === "dashed") {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = rgba($("color").value, alpha);
+      ctx.lineWidth = Math.max(2, Math.round(thickness * 0.28));
+      const dash = ctx.lineWidth * 3.2;
+      const gap = ctx.lineWidth * 2.2;
+
+      const animOn = $("animOn").value === "on";
+      const speed = Number($("animSpeed").value) || 0;
+      const offset = animOn ? -(timeSec * (speed * 6)) : 0;
+
+      ctx.setLineDash([dash, gap]);
+      ctx.lineDashOffset = offset;
+      roundedRectPath(ctx.lineWidth/2, ctx.lineWidth/2, W-ctx.lineWidth, H-ctx.lineWidth, radius);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+
+    // Safe guides and label
+    if ($("safeOn").value === "on") drawSafeGuides(clamp(Number($("safeOpacity").value)/100,0,1));
+    drawLabel(scale);
+  }
+
+  let raf = null;
+  let lastT = performance.now();
+
+  function tick(now) {
+    const dt = (now - lastT) / 1000;
+    lastT = now;
+
+    const anim = $("animOn").value === "on";
+    if (anim) {
+      const t = now / 1000;
+      drawBorder(dt, t);
+    } else {
+      // only redraw if something changed via events
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function ensureRAF() {
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+
+  function redrawOnce() {
+    const anim = $("animOn").value === "on";
+    if (!anim) drawBorder(0, 0);
+  }
+
+  function getSettings() {
+    return {
+      preset: $("preset").value,
+      w: Number($("w").value),
+      h: Number($("h").value),
+      ratio: $("ratio").value,
+      lockRatio: $("lockRatio").value,
+      thickness: Number($("thickness").value),
+      radius: Number($("radius").value),
+      borderStyle: $("borderStyle").value,
+      color: $("color").value,
+      color2: $("color2").value,
+      opacity: Number($("opacity").value),
+      safeOn: $("safeOn").value,
+      safeOpacity: Number($("safeOpacity").value),
+      labelText: $("labelText").value,
+      labelSize: Number($("labelSize").value),
+      labelPos: $("labelPos").value,
+      labelColor: $("labelColor").value,
+      animOn: $("animOn").value,
+      animSpeed: Number($("animSpeed").value),
+      filename: $("filename").value,
+      scale: Number($("scale").value),
+      fps: Number($("fps").value),
+      duration: Number($("duration").value)
+    };
+  }
+
+  function setSettings(s) {
+    $("preset").value = s.preset ?? "9:16";
+    $("w").value = s.w ?? 1080;
+    $("h").value = s.h ?? 1920;
+    $("ratio").value = s.ratio ?? "9:16";
+    $("lockRatio").value = s.lockRatio ?? "on";
+    $("thickness").value = s.thickness ?? 80;
+    $("radius").value = s.radius ?? 40;
+    $("borderStyle").value = s.borderStyle ?? "solid";
+    $("color").value = s.color ?? "#ffffff";
+    $("color2").value = s.color2 ?? "#00e5ff";
+    $("opacity").value = s.opacity ?? 100;
+    $("safeOn").value = s.safeOn ?? "off";
+    $("safeOpacity").value = s.safeOpacity ?? 35;
+    $("labelText").value = s.labelText ?? "";
+    $("labelSize").value = s.labelSize ?? 64;
+    $("labelPos").value = s.labelPos ?? "top";
+    $("labelColor").value = s.labelColor ?? "#ffffff";
+    $("animOn").value = s.animOn ?? "off";
+    $("animSpeed").value = s.animSpeed ?? 35;
+    $("filename").value = s.filename ?? "border-overlay";
+    $("scale").value = s.scale ?? 1;
+    $("fps").value = s.fps ?? 30;
+    $("duration").value = s.duration ?? 3;
+
+    $("opacityLabel").textContent = String($("opacity").value);
+    $("safeOpacityLabel").textContent = String($("safeOpacity").value);
+    $("animSpeedLabel").textContent = String($("animSpeed").value);
+
+    resizeCanvasFromInputs();
+    redrawOnce();
+    ensureRAF();
+  }
+
+  function downloadBlob(blob, filename) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  async function exportPNG() {
+    setStatus("Rendering PNG...");
+    redrawOnce();
+    await new Promise(r => setTimeout(r, 50));
+
+    canvas.toBlob((blob) => {
+      if (!blob) { setStatus("PNG export failed", false); return; }
+      const name = ($("filename").value || "border-overlay") + ".png";
+      downloadBlob(blob, name);
+      setStatus("PNG exported");
+    }, "image/png");
+  }
+
+  async function exportWebM() {
+    const fps = clamp(Number($("fps").value) || 30, 1, 120);
+    const duration = clamp(Number($("duration").value) || 3, 1, 60);
+
+    const mimeCandidates = [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm"
+    ];
+    const mime = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || "";
+    if (!mime) { setStatus("WebM export not supported", false); return; }
+
+    setStatus("Recording WebM...");
+
+    const stream = canvas.captureStream(fps);
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12_000_000 });
+
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
+    const animWasOn = $("animOn").value;
+    $("animOn").value = "on"; // make dashed animation visible if dashed, otherwise still looks fine
+    ensureRAF();
+
+    rec.start(200);
+
+    const t0 = performance.now();
+    while ((performance.now() - t0) < duration * 1000) {
+      // Ensure frames update if animation is off in UI style
+      const t = performance.now() / 1000;
+      drawBorder(0, t);
+      await new Promise(r => setTimeout(r, 1000 / fps));
+    }
+
+    rec.stop();
+
+    await new Promise((resolve) => {
+      rec.onstop = resolve;
+    });
+
+    $("animOn").value = animWasOn;
+
+    const blob = new Blob(chunks, { type: rec.mimeType || "video/webm" });
+    const name = ($("filename").value || "border-overlay") + ".webm";
+    downloadBlob(blob, name);
+
+    setStatus("WebM exported");
+  }
+
+  async function loadGifLib() {
+    // Loads gif.js from CDN only when needed
+    if (window.GIF) return true;
+
+    return await new Promise((resolve) => {
+      const s1 = document.createElement("script");
+      s1.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js";
+      s1.onload = () => resolve(true);
+      s1.onerror = () => resolve(false);
+      document.head.appendChild(s1);
+
+      const s2 = document.createElement("script");
+      s2.src = "https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.worker.js";
+      // worker is loaded internally by gif.js via workerScript, so this is optional, but harmless
+      document.head.appendChild(s2);
+    });
+  }
+
+  async function exportGIF() {
+    const ok = await loadGifLib();
+    if (!ok || !window.GIF) {
+      setStatus("GIF library failed to load", false);
+      return;
+    }
+
+    const fps = clamp(Number($("fps").value) || 15, 1, 60);
+    const duration = clamp(Number($("duration").value) || 3, 1, 20);
+
+    setStatus("Rendering GIF...");
+    const gif = new GIF({
+      workers: 2,
+      quality: 10,
+      workerScript: "https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.worker.js",
+      transparent: 0x000000, // GIF uses 1 color as transparent, limited
+    });
+
+    const totalFrames = Math.round(duration * fps);
+
+    for (let i = 0; i < totalFrames; i++) {
+      const t = i / fps;
+      drawBorder(0, t);
+      gif.addFrame(canvas, { copy: true, delay: Math.round(1000 / fps) });
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    gif.on("finished", (blob) => {
+      const name = ($("filename").value || "border-overlay") + ".gif";
+      downloadBlob(blob, name);
+      setStatus("GIF exported");
+    });
+
+    gif.render();
+  }
+
+  function wire() {
+    const inputs = [
+      "preset","w","h","ratio","lockRatio","thickness","radius","borderStyle",
+      "color","color2","opacity","safeOn","safeOpacity","labelText","labelSize","labelPos",
+      "labelColor","animOn","animSpeed","filename","scale","fps","duration"
+    ];
+
+    for (const id of inputs) {
+      $(id).addEventListener("input", () => {
+        if (id === "opacity") $("opacityLabel").textContent = String($("opacity").value);
+        if (id === "safeOpacity") $("safeOpacityLabel").textContent = String($("safeOpacity").value);
+        if (id === "animSpeed") $("animSpeedLabel").textContent = String($("animSpeed").value);
+
+        if (id === "preset") {
+          $("ratio").value = $("preset").value === "custom" ? $("ratio").value : $("preset").value;
+          applyPreset($("preset").value);
+        }
+
+        if (id === "ratio") {
+          $("preset").value = "custom";
+          if ($("lockRatio").value === "on") applyPreset("custom");
+        }
+
+        if (id === "w" || id === "h") {
+          if ($("lockRatio").value === "on") {
+            const r = parseRatio($("ratio").value);
+            if (r) {
+              if (id === "w") $("h").value = Math.round(Number($("w").value) * (r.b / r.a));
+              if (id === "h") $("w").value = Math.round(Number($("h").value) * (r.a / r.b));
+            }
+          }
+        }
+
+        resizeCanvasFromInputs();
+        redrawOnce();
+        ensureRAF();
+      });
+    }
+
+    $("btnPng").addEventListener("click", exportPNG);
+    $("btnWebm").addEventListener("click", exportWebM);
+    $("btnGif").addEventListener("click", exportGIF);
+
+    $("btnCopySettings").addEventListener("click", async () => {
+      const json = JSON.stringify(getSettings(), null, 2);
+      $("settingsBox").value = json;
+      try { await navigator.clipboard.writeText(json); setStatus("Settings copied"); }
+      catch { setStatus("Settings copied to box"); }
+    });
+
+    $("btnPasteSettings").addEventListener("click", async () => {
+      let txt = $("settingsBox").value.trim();
+      if (!txt) {
+        try { txt = (await navigator.clipboard.readText()).trim(); } catch {}
+      }
+      if (!txt) { setStatus("No settings JSON found", false); return; }
+      try {
+        const obj = JSON.parse(txt);
+        setSettings(obj);
+        setStatus("Settings applied");
+      } catch {
+        setStatus("Invalid JSON", false);
+      }
+    });
+
+    $("btnReset").addEventListener("click", () => {
+      setSettings({
+        preset:"9:16", w:1080, h:1920, ratio:"9:16", lockRatio:"on",
+        thickness:80, radius:40, borderStyle:"solid",
+        color:"#ffffff", color2:"#00e5ff", opacity:100,
+        safeOn:"off", safeOpacity:35,
+        labelText:"", labelSize:64, labelPos:"top", labelColor:"#ffffff",
+        animOn:"off", animSpeed:35,
+        filename:"border-overlay", scale:1, fps:30, duration:3
+      });
+      setStatus("Reset");
+    });
+  }
+
+  // init
+  wire();
+  setSettings(getSettings());
+  setStatus("Ready");
+</script>
+</body>
+</html>

@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Transcript Word Finder (WhisperX JSON) + Fallback</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 16px; line-height: 1.35; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
+    .card h2 { margin: 0 0 8px 0; font-size: 16px; }
+    textarea { width: 100%; min-height: 190px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    input[type="file"] { width: 100%; }
+    button { cursor: pointer; padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; background: #f7f7f7; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .muted { color: #555; font-size: 12px; }
+    .kpi { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 10px; }
+    .kpi .box { border: 1px solid #eee; border-radius: 10px; padding: 10px; }
+    .kpi .big { font-size: 20px; font-weight: 700; }
+    .pill { display: inline-block; padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; font-size: 12px; margin: 2px 4px 2px 0; }
+    .list { max-height: 320px; overflow: auto; border: 1px solid #eee; border-radius: 10px; padding: 8px; background: #fff; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .danger { color: #b00020; }
+    .ok { color: #0b6b0b; }
+    .drop { border: 2px dashed #bbb; border-radius: 10px; padding: 12px; text-align: center; background: #fafafa; margin-top: 8px; }
+    .drop.dragover { border-color: #666; background: #f0f0f0; }
+    .small { font-size: 12px; }
+    .sep { height: 1px; background: #eee; margin: 12px 0; }
+    .missing-row { display:flex; gap:8px; align-items:center; margin: 6px 0; }
+    .missing-row input[type="text"] { flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .badge { display:inline-block; padding: 2px 6px; border-radius: 6px; border: 1px solid #ddd; font-size: 11px; background:#fafafa; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1 style="margin-top:0;">Transcript Word Finder + Fallback</h1>
+  <p class="muted">
+    Load a WhisperX style transcript JSON with per-word timestamps (segments[].words[].word/start/end).
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h2>1) Load transcript JSON</h2>
+      <input id="fileInput" type="file" accept=".json,application/json" />
+      <div id="dropZone" class="drop">
+        Drag and drop JSON here
+        <div class="muted small">Runs locally in your browser.</div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="controls">
+        <label class="small"><input id="optLower" type="checkbox" checked /> lowercase</label>
+        <label class="small"><input id="optStripPunct" type="checkbox" checked /> strip punctuation</label>
+        <label class="small"><input id="optKeepApos" type="checkbox" checked /> keep apostrophes</label>
+        <label class="small"><input id="optNumbers" type="checkbox" checked /> keep numbers</label>
+        <label class="small"><input id="optDedupLyrics" type="checkbox" /> dedupe lyrics words</label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="controls">
+        <button id="exportMapBtn">Export map JSON</button>
+        <button id="importMapBtn">Import map JSON</button>
+        <button id="clearMapBtn">Clear map</button>
+        <input id="importMapFile" type="file" accept=".json,application/json" style="display:none;" />
+      </div>
+      <div class="muted small" style="margin-top:6px;">
+        Fallback map auto-saves locally. Format: <span class="mono">{ "desert": ["dessert"], "gonna": ["going to"] }</span>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="muted">Transcript words indexed</div>
+          <div id="kpiTranscriptTotal" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Unique transcript words</div>
+          <div id="kpiTranscriptUnique" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Transcript duration (approx)</div>
+          <div id="kpiDuration" class="big">0.00s</div>
+        </div>
+      </div>
+
+      <p id="loadStatus" class="muted" style="margin:10px 0 0 0;">No file loaded.</p>
+    </div>
+
+    <div class="card">
+      <h2>2) Paste lyrics or any text</h2>
+      <textarea id="lyrics" placeholder="Paste lyrics here..."></textarea>
+      <div class="controls" style="margin-top:10px;">
+        <button id="analyzeBtn" disabled>Analyze</button>
+        <button id="clearBtn">Clear</button>
+        <button id="exportMissingBtn" disabled>Export missing CSV</button>
+        <button id="exportFoundBtn" disabled>Export found CSV</button>
+        <button id="exportResolvedBtn" disabled>Export resolved CSV</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="muted">Lyrics words</div>
+          <div id="kpiLyricsTotal" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Found (direct + fallback)</div>
+          <div id="kpiFound" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Coverage</div>
+          <div id="kpiCoverage" class="big">0%</div>
+        </div>
+      </div>
+
+      <p class="muted small" style="margin-top:10px;">
+        Missing words can be “rescued” by adding fallback alternates (sounds-like). Use commas for multiple options. Multi-word alternates allowed.
+      </p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
+    <div class="card">
+      <h2>Missing words</h2>
+      <div class="muted small">Add alternates to re-search. Example: <span class="mono">desert → dessert</span>, <span class="mono">gonna → going to</span></div>
+      <div id="missingList" class="list mono"></div>
+    </div>
+
+    <div class="card">
+      <h2>Resolved by fallback</h2>
+      <div class="muted small">These were missing directly, but found via your alternate mapping.</div>
+      <div id="resolvedList" class="list mono"></div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
+    <div class="card" style="grid-column: 1 / -1;">
+      <h2>Found words with timestamps (direct hits)</h2>
+      <div class="muted small">Click a word to expand all occurrences.</div>
+      <div id="foundList" class="list mono" style="max-height:420px;"></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const els = {
+    fileInput: document.getElementById("fileInput"),
+    dropZone: document.getElementById("dropZone"),
+    lyrics: document.getElementById("lyrics"),
+    analyzeBtn: document.getElementById("analyzeBtn"),
+    clearBtn: document.getElementById("clearBtn"),
+    exportMissingBtn: document.getElementById("exportMissingBtn"),
+    exportFoundBtn: document.getElementById("exportFoundBtn"),
+    exportResolvedBtn: document.getElementById("exportResolvedBtn"),
+    optLower: document.getElementById("optLower"),
+    optStripPunct: document.getElementById("optStripPunct"),
+    optKeepApos: document.getElementById("optKeepApos"),
+    optNumbers: document.getElementById("optNumbers"),
+    optDedupLyrics: document.getElementById("optDedupLyrics"),
+    loadStatus: document.getElementById("loadStatus"),
+    kpiTranscriptTotal: document.getElementById("kpiTranscriptTotal"),
+    kpiTranscriptUnique: document.getElementById("kpiTranscriptUnique"),
+    kpiDuration: document.getElementById("kpiDuration"),
+    kpiLyricsTotal: document.getElementById("kpiLyricsTotal"),
+    kpiFound: document.getElementById("kpiFound"),
+    kpiCoverage: document.getElementById("kpiCoverage"),
+    missingList: document.getElementById("missingList"),
+    resolvedList: document.getElementById("resolvedList"),
+    foundList: document.getElementById("foundList"),
+    exportMapBtn: document.getElementById("exportMapBtn"),
+    importMapBtn: document.getElementById("importMapBtn"),
+    clearMapBtn: document.getElementById("clearMapBtn"),
+    importMapFile: document.getElementById("importMapFile"),
+  };
+
+  /** transcriptIndex: word -> occurrences */
+  let transcriptIndex = new Map();
+  let transcriptTotalWords = 0;
+  let transcriptMaxEnd = 0;
+
+  /** fallbackMap: missingWord -> array of alternate strings (not normalized yet) */
+  let fallbackMap = loadFallbackMap();
+
+  /** last analysis */
+  let lastMissing = [];
+  let lastFound = [];
+  let lastResolved = []; // {missingWord, usedAlternate, tokensUsed, occurrences}
+
+  function loadFallbackMap() {
+    try {
+      const raw = localStorage.getItem("twf_fallback_map_v1");
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {}
+    return {};
+  }
+
+  function saveFallbackMap() {
+    try {
+      localStorage.setItem("twf_fallback_map_v1", JSON.stringify(fallbackMap, null, 2));
+    } catch {}
+  }
+
+  function normalizeToken(tok) {
+    if (!tok) return "";
+    let t = String(tok);
+
+    if (els.optLower.checked) t = t.toLowerCase();
+
+    if (els.optStripPunct.checked) {
+      const keepApos = els.optKeepApos.checked;
+      const keepNums = els.optNumbers.checked;
+
+      let allowed = "a-z";
+      if (keepNums) allowed += "0-9";
+      if (keepApos) allowed += "'";
+
+      const re = new RegExp(`[^${allowed}]+`, "g");
+      t = t.replace(re, " ");
+      t = t.trim();
+    }
+
+    return t.trim();
+  }
+
+  function tokenizeText(text) {
+    const rough = (text || "").split(/\s+/).filter(Boolean);
+    const out = [];
+    for (const r of rough) {
+      const n = normalizeToken(r);
+      if (!n) continue;
+      const parts = n.split(/\s+/).filter(Boolean);
+      for (const p of parts) out.push(p);
+    }
+    return out;
+  }
+
+  function parseTranscriptJson(obj) {
+    const segments = obj && Array.isArray(obj.segments) ? obj.segments : null;
+    if (!segments) throw new Error("JSON does not contain a segments[] array.");
+
+    transcriptIndex = new Map();
+    transcriptTotalWords = 0;
+    transcriptMaxEnd = 0;
+
+    segments.forEach((seg, segIndex) => {
+      if (seg && typeof seg.end === "number") transcriptMaxEnd = Math.max(transcriptMaxEnd, seg.end);
+      const words = seg && Array.isArray(seg.words) ? seg.words : [];
+      words.forEach(w => {
+        const raw = (w && w.word != null) ? String(w.word) : "";
+        const start = (w && typeof w.start === "number") ? w.start : NaN;
+        const end = (w && typeof w.end === "number") ? w.end : NaN;
+        const score = (w && typeof w.score === "number") ? w.score : NaN;
+
+        const toks = tokenizeText(raw);
+        if (toks.length === 0) return;
+
+        toks.forEach(tok => {
+          transcriptTotalWords += 1;
+          if (!transcriptIndex.has(tok)) transcriptIndex.set(tok, []);
+          transcriptIndex.get(tok).push({ start, end, score, raw, segIndex });
+        });
+
+        if (!Number.isNaN(end)) transcriptMaxEnd = Math.max(transcriptMaxEnd, end);
+      });
+    });
+
+    els.kpiTranscriptTotal.textContent = String(transcriptTotalWords);
+    els.kpiTranscriptUnique.textContent = String(transcriptIndex.size);
+    els.kpiDuration.textContent = (transcriptMaxEnd || 0).toFixed(2) + "s";
+  }
+
+  function setLoaded(ok, msg) {
+    els.loadStatus.textContent = msg;
+    els.analyzeBtn.disabled = !ok;
+  }
+
+  function readFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file."));
+      reader.readAsText(file);
+    });
+  }
+
+  function msToTimestamp(seconds) {
+    if (!Number.isFinite(seconds)) return "";
+    const ms = Math.round(seconds * 1000);
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const ss = String(s % 60).padStart(2, "0");
+    const mm = String(m % 60).padStart(2, "0");
+    const hh = String(h).padStart(2, "0");
+    const mmm = String(ms % 1000).padStart(3, "0");
+    return `${hh}:${mm}:${ss}.${mmm}`;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function analyze() {
+    const lyricsText = els.lyrics.value || "";
+    let lyricTokens = tokenizeText(lyricsText);
+
+    if (els.optDedupLyrics.checked) {
+      lyricTokens = Array.from(new Set(lyricTokens));
+    }
+
+    const missing = [];
+    const found = [];     // direct hits: {word, occurrences}
+    const resolved = [];  // fallback hits: {missingWord, usedAlternate, tokensUsed, occurrences}
+
+    const directFoundSet = new Set();
+
+    for (const tok of lyricTokens) {
+      if (!tok) continue;
+      const occ = transcriptIndex.get(tok);
+      if (occ && occ.length > 0) {
+        found.push({ word: tok, occurrences: occ });
+        directFoundSet.add(tok);
+      } else {
+        missing.push(tok);
+      }
+    }
+
+    // Try fallback mapping for missing
+    const stillMissing = [];
+    for (const miss of missing) {
+      const altsRaw = fallbackMap[miss];
+      const alts = normalizeAlternates(altsRaw);
+      let matched = false;
+
+      for (const alt of alts) {
+        // alt may be multiple tokens: all tokens must exist for "resolved"
+        const altTokens = tokenizeText(alt);
+        if (altTokens.length === 0) continue;
+
+        // Gather occurrences for each token; require each token to exist
+        const occsByToken = altTokens.map(t => transcriptIndex.get(t) || []);
+        if (occsByToken.some(arr => arr.length === 0)) continue;
+
+        // Flatten occurrences and tag with which token they came from
+        const flat = [];
+        occsByToken.forEach((arr, idx) => {
+          arr.forEach(o => flat.push({ ...o, matchedToken: altTokens[idx] }));
+        });
+
+        resolved.push({
+          missingWord: miss,
+          usedAlternate: alt,
+          tokensUsed: altTokens.slice(),
+          occurrences: flat.sort((a,b) => (a.start - b.start)),
+        });
+
+        matched = true;
+        break;
+      }
+
+      if (!matched) stillMissing.push(miss);
+    }
+
+    // KPIs
+    els.kpiLyricsTotal.textContent = String(lyricTokens.length);
+
+    const foundCount = (lyricTokens.length - stillMissing.length);
+    els.kpiFound.textContent = String(foundCount);
+
+    const coverage = lyricTokens.length === 0 ? 0 : Math.round((foundCount / lyricTokens.length) * 100);
+    els.kpiCoverage.textContent = String(coverage) + "%";
+
+    renderMissing(stillMissing);
+    renderResolved(resolved);
+    renderFound(found);
+
+    lastMissing = stillMissing.slice();
+    lastFound = found.slice();
+    lastResolved = resolved.slice();
+
+    els.exportMissingBtn.disabled = !(stillMissing.length > 0);
+    els.exportFoundBtn.disabled = !(found.length > 0);
+    els.exportResolvedBtn.disabled = !(resolved.length > 0);
+  }
+
+  function normalizeAlternates(altsRaw) {
+    if (!altsRaw) return [];
+    if (Array.isArray(altsRaw)) {
+      return altsRaw.map(String).map(s => s.trim()).filter(Boolean);
+    }
+    if (typeof altsRaw === "string") {
+      // allow comma-separated
+      return altsRaw.split(",").map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  function renderMissing(missing) {
+    els.missingList.innerHTML = "";
+
+    if ((els.lyrics.value || "").trim() === "") {
+      els.missingList.innerHTML = `<div class="muted">Paste lyrics above, then Analyze.</div>`;
+      return;
+    }
+
+    if (missing.length === 0) {
+      els.missingList.innerHTML = `<div class="ok">No missing words (after fallback).</div>`;
+      return;
+    }
+
+    // Count duplicates
+    const counts = new Map();
+    missing.forEach(w => counts.set(w, (counts.get(w) || 0) + 1));
+    const unique = Array.from(counts.entries()).sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]));
+
+    unique.forEach(([word, count]) => {
+      const row = document.createElement("div");
+      row.className = "missing-row";
+
+      const left = document.createElement("div");
+      left.innerHTML = `<span class="pill danger">${escapeHtml(word)}</span> <span class="muted">x${count}</span>`;
+      left.style.minWidth = "140px";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = 'sounds-like / alternate (comma-separated)';
+      input.value = (normalizeAlternates(fallbackMap[word]).join(", "));
+      input.addEventListener("change", () => {
+        const val = input.value.trim();
+        if (!val) {
+          delete fallbackMap[word];
+        } else {
+          // store as array of strings
+          fallbackMap[word] = val.split(",").map(s => s.trim()).filter(Boolean);
+        }
+        saveFallbackMap();
+      });
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Recheck";
+      btn.addEventListener("click", () => {
+        // ensure latest input is saved
+        const val = input.value.trim();
+        if (!val) delete fallbackMap[word];
+        else fallbackMap[word] = val.split(",").map(s => s.trim()).filter(Boolean);
+        saveFallbackMap();
+        analyze();
+      });
+
+      row.appendChild(left);
+      row.appendChild(input);
+      row.appendChild(btn);
+      els.missingList.appendChild(row);
+    });
+  }
+
+  function renderResolved(resolved) {
+    els.resolvedList.innerHTML = "";
+
+    if ((els.lyrics.value || "").trim() === "") {
+      els.resolvedList.innerHTML = `<div class="muted">Paste lyrics above, then Analyze.</div>`;
+      return;
+    }
+
+    if (resolved.length === 0) {
+      els.resolvedList.innerHTML = `<div class="muted">No fallback resolutions yet.</div>`;
+      return;
+    }
+
+    // group by missingWord
+    const byWord = new Map();
+    resolved.forEach(r => {
+      if (!byWord.has(r.missingWord)) byWord.set(r.missingWord, []);
+      byWord.get(r.missingWord).push(r);
+    });
+
+    Array.from(byWord.entries()).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([mw, items]) => {
+      const wrap = document.createElement("div");
+      wrap.style.marginBottom = "10px";
+
+      const header = document.createElement("button");
+      header.type = "button";
+      header.textContent = `${mw} → ${items[0].usedAlternate}`;
+      header.style.width = "100%";
+      header.style.textAlign = "left";
+
+      const details = document.createElement("div");
+      details.style.display = "none";
+      details.style.marginTop = "6px";
+      details.style.paddingLeft = "6px";
+
+      const first = items[0];
+      const lines = first.occurrences.slice(0, 200).map(o => {
+        const a = msToTimestamp(o.start);
+        const b = msToTimestamp(o.end);
+        const sc = Number.isFinite(o.score) ? o.score.toFixed(3) : "";
+        return `<div class="mono">${a} - ${b} <span class="muted">token:${escapeHtml(o.matchedToken)} score:${sc} seg:${o.segIndex} raw:${escapeHtml(o.raw)}</span></div>`;
+      }).join("");
+
+      const note = first.occurrences.length > 200 ? `<div class="muted small">Showing first 200 occurrences.</div>` : "";
+      details.innerHTML = `<div class="muted small">Tokens used: ${first.tokensUsed.map(escapeHtml).join(", ")}</div>` + note + lines;
+
+      header.addEventListener("click", () => {
+        details.style.display = (details.style.display === "none") ? "block" : "none";
+      });
+
+      wrap.appendChild(header);
+      wrap.appendChild(details);
+      els.resolvedList.appendChild(wrap);
+    });
+  }
+
+  function renderFound(found) {
+    els.foundList.innerHTML = "";
+
+    if ((els.lyrics.value || "").trim() === "") {
+      els.foundList.innerHTML = `<div class="muted">Paste lyrics above, then Analyze.</div>`;
+      return;
+    }
+
+    if (found.length === 0) {
+      els.foundList.innerHTML = `<div class="danger">No direct hits found.</div>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    found.sort((a,b) => a.word.localeCompare(b.word));
+    found.forEach(item => {
+      const wrap = document.createElement("div");
+      wrap.style.marginBottom = "10px";
+
+      const header = document.createElement("button");
+      header.type = "button";
+      header.textContent = `${item.word} (${item.occurrences.length})`;
+      header.style.width = "100%";
+      header.style.textAlign = "left";
+
+      const details = document.createElement("div");
+      details.style.display = "none";
+      details.style.marginTop = "6px";
+      details.style.paddingLeft = "6px";
+
+      const occSorted = item.occurrences.slice().sort((x,y) => (x.start - y.start));
+      const lines = occSorted.slice(0, 200).map(o => {
+        const a = msToTimestamp(o.start);
+        const b = msToTimestamp(o.end);
+        const sc = Number.isFinite(o.score) ? o.score.toFixed(3) : "";
+        return `<div class="mono">${a} - ${b} <span class="muted">score:${sc} seg:${o.segIndex} raw:${escapeHtml(o.raw)}</span></div>`;
+      }).join("");
+
+      const note = occSorted.length > 200 ? `<div class="muted small">Showing first 200 occurrences.</div>` : "";
+      details.innerHTML = note + lines;
+
+      header.addEventListener("click", () => {
+        details.style.display = (details.style.display === "none") ? "block" : "none";
+      });
+
+      wrap.appendChild(header);
+      wrap.appendChild(details);
+      frag.appendChild(wrap);
+    });
+    els.foundList.appendChild(frag);
+  }
+
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function toCsvRow(cols) {
+    return cols.map(v => {
+      const s = String(v ?? "");
+      const escaped = s.replaceAll('"', '""');
+      return `"${escaped}"`;
+    }).join(",");
+  }
+
+  function exportMissingCsv() {
+    const header = toCsvRow(["word"]);
+    const rows = lastMissing.map(w => toCsvRow([w]));
+    downloadText("missing_words.csv", [header, ...rows].join("\n"));
+  }
+
+  function exportFoundCsv() {
+    const header = toCsvRow(["word", "start_seconds", "end_seconds", "start_timecode", "end_timecode", "score", "segment_index", "raw"]);
+    const rows = [];
+    lastFound.forEach(item => {
+      item.occurrences.forEach(o => {
+        rows.push(toCsvRow([
+          item.word,
+          Number.isFinite(o.start) ? o.start : "",
+          Number.isFinite(o.end) ? o.end : "",
+          msToTimestamp(o.start),
+          msToTimestamp(o.end),
+          Number.isFinite(o.score) ? o.score : "",
+          o.segIndex ?? "",
+          o.raw ?? ""
+        ]));
+      });
+    });
+    downloadText("found_occurrences.csv", [header, ...rows].join("\n"));
+  }
+
+  function exportResolvedCsv() {
+    const header = toCsvRow(["missing_word", "used_alternate", "matched_token", "start_seconds", "end_seconds", "start_timecode", "end_timecode", "score", "segment_index", "raw"]);
+    const rows = [];
+    lastResolved.forEach(r => {
+      r.occurrences.forEach(o => {
+        rows.push(toCsvRow([
+          r.missingWord,
+          r.usedAlternate,
+          o.matchedToken,
+          Number.isFinite(o.start) ? o.start : "",
+          Number.isFinite(o.end) ? o.end : "",
+          msToTimestamp(o.start),
+          msToTimestamp(o.end),
+          Number.isFinite(o.score) ? o.score : "",
+          o.segIndex ?? "",
+          o.raw ?? ""
+        ]));
+      });
+    });
+    downloadText("resolved_fallback_occurrences.csv", [header, ...rows].join("\n"));
+  }
+
+  async function handleFile(file) {
+    try {
+      const text = await readFile(file);
+      const obj = JSON.parse(text);
+      parseTranscriptJson(obj);
+      setLoaded(true, `Loaded: ${file.name} | unique words: ${els.kpiTranscriptUnique.textContent}`);
+      els.exportMissingBtn.disabled = true;
+      els.exportFoundBtn.disabled = true;
+      els.exportResolvedBtn.disabled = true;
+      if ((els.lyrics.value || "").trim()) analyze();
+    } catch (e) {
+      transcriptIndex = new Map();
+      transcriptTotalWords = 0;
+      transcriptMaxEnd = 0;
+      els.kpiTranscriptTotal.textContent = "0";
+      els.kpiTranscriptUnique.textContent = "0";
+      els.kpiDuration.textContent = "0.00s";
+      setLoaded(false, `Load failed: ${e && e.message ? e.message : String(e)}`);
+    }
+  }
+
+  // Map import/export
+  els.exportMapBtn.addEventListener("click", () => {
+    downloadText("fallback_map.json", JSON.stringify(fallbackMap, null, 2));
+  });
+
+  els.importMapBtn.addEventListener("click", () => els.importMapFile.click());
+
+  els.importMapFile.addEventListener("change", async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    try {
+      const text = await readFile(f);
+      const obj = JSON.parse(text);
+      if (!obj || typeof obj !== "object") throw new Error("Invalid JSON.");
+      fallbackMap = obj;
+      saveFallbackMap();
+      if (transcriptIndex.size > 0 && (els.lyrics.value || "").trim()) analyze();
+    } catch (e) {
+      alert("Import failed: " + (e && e.message ? e.message : String(e)));
+    } finally {
+      ev.target.value = "";
+    }
+  });
+
+  els.clearMapBtn.addEventListener("click", () => {
+    fallbackMap = {};
+    saveFallbackMap();
+    if (transcriptIndex.size > 0 && (els.lyrics.value || "").trim()) analyze();
+  });
+
+  // File input + DnD
+  els.fileInput.addEventListener("change", (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (f) handleFile(f);
+  });
+
+  els.dropZone.addEventListener("dragover", (ev) => {
+    ev.preventDefault();
+    els.dropZone.classList.add("dragover");
+  });
+  els.dropZone.addEventListener("dragleave", () => els.dropZone.classList.remove("dragover"));
+  els.dropZone.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    els.dropZone.classList.remove("dragover");
+    const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  // Buttons
+  els.analyzeBtn.addEventListener("click", analyze);
+
+  els.clearBtn.addEventListener("click", () => {
+    els.lyrics.value = "";
+    els.missingList.innerHTML = "";
+    els.resolvedList.innerHTML = "";
+    els.foundList.innerHTML = "";
+    els.kpiLyricsTotal.textContent = "0";
+    els.kpiFound.textContent = "0";
+    els.kpiCoverage.textContent = "0%";
+    lastMissing = [];
+    lastFound = [];
+    lastResolved = [];
+    els.exportMissingBtn.disabled = true;
+    els.exportFoundBtn.disabled = true;
+    els.exportResolvedBtn.disabled = true;
+  });
+
+  // Re-run analysis when options change
+  const reanalyzeIfReady = () => {
+    if (transcriptIndex.size > 0 && (els.lyrics.value || "").trim()) analyze();
+  };
+  [els.optLower, els.optStripPunct, els.optKeepApos, els.optNumbers, els.optDedupLyrics].forEach(cb => {
+    cb.addEventListener("change", reanalyzeIfReady);
+  });
+
+  els.exportMissingBtn.addEventListener("click", exportMissingCsv);
+  els.exportFoundBtn.addEventListener("click", exportFoundCsv);
+  els.exportResolvedBtn.addEventListener("click", exportResolvedCsv);
+})();
+</script>
+</body>
+</html>

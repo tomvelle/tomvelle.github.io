@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Transcript Word Finder (WhisperX JSON)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 16px; line-height: 1.35; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; }
+    .card h2 { margin: 0 0 8px 0; font-size: 16px; }
+    textarea { width: 100%; min-height: 190px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    input[type="file"] { width: 100%; }
+    button { cursor: pointer; padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; background: #f7f7f7; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .muted { color: #555; font-size: 12px; }
+    .kpi { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 10px; }
+    .kpi .box { border: 1px solid #eee; border-radius: 10px; padding: 10px; }
+    .kpi .big { font-size: 20px; font-weight: 700; }
+    .pill { display: inline-block; padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; font-size: 12px; margin: 2px 4px 2px 0; }
+    .list { max-height: 320px; overflow: auto; border: 1px solid #eee; border-radius: 10px; padding: 8px; background: #fff; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .danger { color: #b00020; }
+    .ok { color: #0b6b0b; }
+    .drop {
+      border: 2px dashed #bbb; border-radius: 10px; padding: 12px; text-align: center;
+      background: #fafafa; margin-top: 8px;
+    }
+    .drop.dragover { border-color: #666; background: #f0f0f0; }
+    .small { font-size: 12px; }
+    .sep { height: 1px; background: #eee; margin: 12px 0; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1 style="margin-top:0;">Transcript Word Finder</h1>
+  <p class="muted">
+    Load a WhisperX style transcript JSON with per-word timestamps (segments[].words[].word/start/end). :contentReference[oaicite:1]{index=1}
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h2>1) Load transcript JSON</h2>
+      <input id="fileInput" type="file" accept=".json,application/json" />
+      <div id="dropZone" class="drop">
+        Drag and drop JSON here
+        <div class="muted small">Nothing uploads anywhere. This runs locally in your browser.</div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="controls">
+        <label class="small"><input id="optLower" type="checkbox" checked /> lowercase</label>
+        <label class="small"><input id="optStripPunct" type="checkbox" checked /> strip punctuation</label>
+        <label class="small"><input id="optKeepApos" type="checkbox" checked /> keep apostrophes (don't)</label>
+        <label class="small"><input id="optNumbers" type="checkbox" checked /> keep numbers</label>
+        <label class="small"><input id="optDedupLyrics" type="checkbox" /> dedupe lyrics words</label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="muted">Transcript words indexed</div>
+          <div id="kpiTranscriptTotal" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Unique transcript words</div>
+          <div id="kpiTranscriptUnique" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Transcript duration (approx)</div>
+          <div id="kpiDuration" class="big">0.00s</div>
+        </div>
+      </div>
+
+      <p id="loadStatus" class="muted" style="margin:10px 0 0 0;">No file loaded.</p>
+    </div>
+
+    <div class="card">
+      <h2>2) Paste lyrics or any text</h2>
+      <textarea id="lyrics" placeholder="Paste lyrics here..."></textarea>
+      <div class="controls" style="margin-top:10px;">
+        <button id="analyzeBtn" disabled>Analyze</button>
+        <button id="clearBtn">Clear</button>
+        <button id="exportMissingBtn" disabled>Export missing CSV</button>
+        <button id="exportFoundBtn" disabled>Export found CSV</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="muted">Lyrics words</div>
+          <div id="kpiLyricsTotal" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Found (count)</div>
+          <div id="kpiFound" class="big">0</div>
+        </div>
+        <div class="box">
+          <div class="muted">Coverage</div>
+          <div id="kpiCoverage" class="big">0%</div>
+        </div>
+      </div>
+
+      <p class="muted small" style="margin-top:10px;">
+        Tip: for “every individual word is said out loud”, you want coverage near 100% after normalization.
+        If you get a lot of missing words, it is not close.
+      </p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px;">
+    <div class="card">
+      <h2>Missing words (lyrics words not found in transcript)</h2>
+      <div id="missingList" class="list mono"></div>
+    </div>
+    <div class="card">
+      <h2>Found words with timestamps</h2>
+      <div class="muted small">Click a word to expand all occurrences.</div>
+      <div id="foundList" class="list mono"></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const els = {
+    fileInput: document.getElementById("fileInput"),
+    dropZone: document.getElementById("dropZone"),
+    lyrics: document.getElementById("lyrics"),
+    analyzeBtn: document.getElementById("analyzeBtn"),
+    clearBtn: document.getElementById("clearBtn"),
+    exportMissingBtn: document.getElementById("exportMissingBtn"),
+    exportFoundBtn: document.getElementById("exportFoundBtn"),
+    optLower: document.getElementById("optLower"),
+    optStripPunct: document.getElementById("optStripPunct"),
+    optKeepApos: document.getElementById("optKeepApos"),
+    optNumbers: document.getElementById("optNumbers"),
+    optDedupLyrics: document.getElementById("optDedupLyrics"),
+    loadStatus: document.getElementById("loadStatus"),
+    kpiTranscriptTotal: document.getElementById("kpiTranscriptTotal"),
+    kpiTranscriptUnique: document.getElementById("kpiTranscriptUnique"),
+    kpiDuration: document.getElementById("kpiDuration"),
+    kpiLyricsTotal: document.getElementById("kpiLyricsTotal"),
+    kpiFound: document.getElementById("kpiFound"),
+    kpiCoverage: document.getElementById("kpiCoverage"),
+    missingList: document.getElementById("missingList"),
+    foundList: document.getElementById("foundList"),
+  };
+
+  /** @type {Map<string, Array<{start:number,end:number,score:number,raw:string,segIndex:number}>>} */
+  let transcriptIndex = new Map();
+  let transcriptTotalWords = 0;
+  let transcriptMaxEnd = 0;
+
+  /** last analysis */
+  let lastMissing = [];
+  let lastFound = [];
+
+  function normalizeToken(tok) {
+    if (!tok) return "";
+    let t = tok;
+
+    if (els.optLower.checked) t = t.toLowerCase();
+
+    // Optionally strip punctuation. Keep apostrophes optionally.
+    if (els.optStripPunct.checked) {
+      // If keep apostrophes: allow a-z, 0-9, apostrophe.
+      // Else: allow a-z, 0-9 only.
+      const keepApos = els.optKeepApos.checked;
+      const keepNums = els.optNumbers.checked;
+
+      let allowed = "a-z";
+      if (keepNums) allowed += "0-9";
+      if (keepApos) allowed += "'";
+
+      // Replace everything not allowed with space, then collapse.
+      const re = new RegExp(`[^${allowed}]+`, "g");
+      t = t.replace(re, " ");
+      t = t.trim();
+      // If punctuation splitting created spaces, keep only first chunk if it is a single word token
+      // (we will split later anyway).
+    }
+
+    return t.trim();
+  }
+
+  function tokenizeText(text) {
+    // Split on whitespace first, then normalize each piece, then split again in case normalization created spaces.
+    const rough = (text || "").split(/\s+/).filter(Boolean);
+    const out = [];
+    for (const r of rough) {
+      const n = normalizeToken(r);
+      if (!n) continue;
+      const parts = n.split(/\s+/).filter(Boolean);
+      for (const p of parts) out.push(p);
+    }
+    return out;
+  }
+
+  function parseTranscriptJson(obj) {
+    // Supports common WhisperX shapes:
+    // 1) { segments: [ { start, end, text, words: [ { word, start, end, score } ] } ] }
+    // 2) Sometimes words live at top-level: { word_segments: [...] } etc. We will focus on segments.words first.
+    const segments = obj && Array.isArray(obj.segments) ? obj.segments : null;
+    if (!segments) {
+      throw new Error("JSON does not contain a segments[] array.");
+    }
+
+    transcriptIndex = new Map();
+    transcriptTotalWords = 0;
+    transcriptMaxEnd = 0;
+
+    segments.forEach((seg, segIndex) => {
+      if (seg && typeof seg.end === "number") transcriptMaxEnd = Math.max(transcriptMaxEnd, seg.end);
+      const words = seg && Array.isArray(seg.words) ? seg.words : [];
+      words.forEach(w => {
+        const raw = (w && w.word != null) ? String(w.word) : "";
+        const start = (w && typeof w.start === "number") ? w.start : NaN;
+        const end = (w && typeof w.end === "number") ? w.end : NaN;
+        const score = (w && typeof w.score === "number") ? w.score : NaN;
+
+        const toks = tokenizeText(raw); // handles things like "this." or "Switzerland,"
+        if (toks.length === 0) return;
+
+        // If raw produced multiple tokens (rare), we record each token with same timestamp range.
+        toks.forEach(tok => {
+          transcriptTotalWords += 1;
+          if (!transcriptIndex.has(tok)) transcriptIndex.set(tok, []);
+          transcriptIndex.get(tok).push({ start, end, score, raw, segIndex });
+        });
+
+        if (!Number.isNaN(end)) transcriptMaxEnd = Math.max(transcriptMaxEnd, end);
+      });
+    });
+
+    els.kpiTranscriptTotal.textContent = String(transcriptTotalWords);
+    els.kpiTranscriptUnique.textContent = String(transcriptIndex.size);
+    els.kpiDuration.textContent = (transcriptMaxEnd || 0).toFixed(2) + "s";
+  }
+
+  function setLoaded(ok, msg) {
+    els.loadStatus.textContent = msg;
+    els.analyzeBtn.disabled = !ok;
+  }
+
+  function readFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file."));
+      reader.readAsText(file);
+    });
+  }
+
+  function msToTimestamp(seconds) {
+    if (!Number.isFinite(seconds)) return "";
+    const ms = Math.round(seconds * 1000);
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const ss = String(s % 60).padStart(2, "0");
+    const mm = String(m % 60).padStart(2, "0");
+    const hh = String(h).padStart(2, "0");
+    const mmm = String(ms % 1000).padStart(3, "0");
+    return `${hh}:${mm}:${ss}.${mmm}`;
+  }
+
+  function analyze() {
+    const lyricsText = els.lyrics.value || "";
+    let lyricTokens = tokenizeText(lyricsText);
+
+    if (els.optDedupLyrics.checked) {
+      lyricTokens = Array.from(new Set(lyricTokens));
+    }
+
+    const missing = [];
+    const found = [];
+
+    for (const tok of lyricTokens) {
+      if (!tok) continue;
+      const occ = transcriptIndex.get(tok);
+      if (!occ || occ.length === 0) {
+        missing.push(tok);
+      } else {
+        found.push({ word: tok, occurrences: occ });
+      }
+    }
+
+    // KPIs
+    els.kpiLyricsTotal.textContent = String(lyricTokens.length);
+    els.kpiFound.textContent = String(lyricTokens.length - missing.length);
+    const coverage = lyricTokens.length === 0 ? 0 : Math.round(((lyricTokens.length - missing.length) / lyricTokens.length) * 100);
+    els.kpiCoverage.textContent = String(coverage) + "%";
+
+    // Render missing
+    els.missingList.innerHTML = "";
+    if (missing.length === 0 && lyricTokens.length > 0) {
+      els.missingList.innerHTML = `<div class="ok">All lyric words were found in the transcript after normalization.</div>`;
+    } else if (lyricTokens.length === 0) {
+      els.missingList.innerHTML = `<div class="muted">Paste lyrics above, then Analyze.</div>`;
+    } else {
+      const counts = new Map();
+      missing.forEach(w => counts.set(w, (counts.get(w) || 0) + 1));
+      // show sorted by frequency then alpha
+      const items = Array.from(counts.entries()).sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]));
+      const frag = document.createDocumentFragment();
+      items.forEach(([w,c]) => {
+        const div = document.createElement("div");
+        div.innerHTML = `<span class="pill danger">${escapeHtml(w)}</span> <span class="muted">x${c}</span>`;
+        frag.appendChild(div);
+      });
+      els.missingList.appendChild(frag);
+    }
+
+    // Render found list (collapsed)
+    els.foundList.innerHTML = "";
+    if (found.length === 0 && lyricTokens.length > 0) {
+      els.foundList.innerHTML = `<div class="danger">No lyric words were found.</div>`;
+    } else if (lyricTokens.length === 0) {
+      els.foundList.innerHTML = `<div class="muted">Paste lyrics above, then Analyze.</div>`;
+    } else {
+      const frag = document.createDocumentFragment();
+      found.sort((a,b) => a.word.localeCompare(b.word));
+      found.forEach(item => {
+        const wrap = document.createElement("div");
+        wrap.style.marginBottom = "10px";
+
+        const header = document.createElement("button");
+        header.type = "button";
+        header.textContent = `${item.word} (${item.occurrences.length})`;
+        header.style.width = "100%";
+        header.style.textAlign = "left";
+
+        const details = document.createElement("div");
+        details.style.display = "none";
+        details.style.marginTop = "6px";
+        details.style.paddingLeft = "6px";
+
+        const occSorted = item.occurrences.slice().sort((x,y) => (x.start - y.start));
+        const lines = occSorted.slice(0, 200).map(o => {
+          const a = msToTimestamp(o.start);
+          const b = msToTimestamp(o.end);
+          const sc = Number.isFinite(o.score) ? o.score.toFixed(3) : "";
+          return `<div class="mono">${a} - ${b} <span class="muted">score:${sc} seg:${o.segIndex} raw:${escapeHtml(o.raw)}</span></div>`;
+        }).join("");
+
+        const note = occSorted.length > 200 ? `<div class="muted small">Showing first 200 occurrences.</div>` : "";
+        details.innerHTML = note + lines;
+
+        header.addEventListener("click", () => {
+          details.style.display = (details.style.display === "none") ? "block" : "none";
+        });
+
+        wrap.appendChild(header);
+        wrap.appendChild(details);
+        frag.appendChild(wrap);
+      });
+      els.foundList.appendChild(frag);
+    }
+
+    lastMissing = missing.slice();
+    lastFound = found.slice();
+
+    els.exportMissingBtn.disabled = !(missing.length > 0);
+    els.exportFoundBtn.disabled = !(found.length > 0);
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function toCsvRow(cols) {
+    return cols.map(v => {
+      const s = String(v ?? "");
+      const escaped = s.replaceAll('"', '""');
+      return `"${escaped}"`;
+    }).join(",");
+  }
+
+  function exportMissingCsv() {
+    // Missing list includes duplicates. That is useful for lyrics coverage.
+    const header = toCsvRow(["word"]);
+    const rows = lastMissing.map(w => toCsvRow([w]));
+    downloadText("missing_words.csv", [header, ...rows].join("\n"));
+  }
+
+  function exportFoundCsv() {
+    // Flatten occurrences
+    const header = toCsvRow(["word", "start_seconds", "end_seconds", "start_timecode", "end_timecode", "score", "segment_index", "raw"]);
+    const rows = [];
+    lastFound.forEach(item => {
+      item.occurrences.forEach(o => {
+        rows.push(toCsvRow([
+          item.word,
+          Number.isFinite(o.start) ? o.start : "",
+          Number.isFinite(o.end) ? o.end : "",
+          msToTimestamp(o.start),
+          msToTimestamp(o.end),
+          Number.isFinite(o.score) ? o.score : "",
+          o.segIndex ?? "",
+          o.raw ?? ""
+        ]));
+      });
+    });
+    downloadText("found_occurrences.csv", [header, ...rows].join("\n"));
+  }
+
+  async function handleFile(file) {
+    try {
+      const text = await readFile(file);
+      const obj = JSON.parse(text);
+      parseTranscriptJson(obj);
+      setLoaded(true, `Loaded: ${file.name} | segments indexed: ${els.kpiTranscriptUnique.textContent} unique words`);
+      els.exportMissingBtn.disabled = true;
+      els.exportFoundBtn.disabled = true;
+      // auto analyze if lyrics already pasted
+      if ((els.lyrics.value || "").trim()) analyze();
+    } catch (e) {
+      transcriptIndex = new Map();
+      transcriptTotalWords = 0;
+      transcriptMaxEnd = 0;
+      els.kpiTranscriptTotal.textContent = "0";
+      els.kpiTranscriptUnique.textContent = "0";
+      els.kpiDuration.textContent = "0.00s";
+      setLoaded(false, `Load failed: ${e && e.message ? e.message : String(e)}`);
+    }
+  }
+
+  // Events
+  els.fileInput.addEventListener("change", (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (f) handleFile(f);
+  });
+
+  els.dropZone.addEventListener("dragover", (ev) => {
+    ev.preventDefault();
+    els.dropZone.classList.add("dragover");
+  });
+  els.dropZone.addEventListener("dragleave", () => {
+    els.dropZone.classList.remove("dragover");
+  });
+  els.dropZone.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    els.dropZone.classList.remove("dragover");
+    const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  els.analyzeBtn.addEventListener("click", analyze);
+
+  els.clearBtn.addEventListener("click", () => {
+    els.lyrics.value = "";
+    els.missingList.innerHTML = "";
+    els.foundList.innerHTML = "";
+    els.kpiLyricsTotal.textContent = "0";
+    els.kpiFound.textContent = "0";
+    els.kpiCoverage.textContent = "0%";
+    lastMissing = [];
+    lastFound = [];
+    els.exportMissingBtn.disabled = true;
+    els.exportFoundBtn.disabled = true;
+  });
+
+  // Re-run analysis when options change (if we have both transcript and lyrics)
+  const reanalyzeIfReady = () => {
+    if (transcriptIndex.size > 0 && (els.lyrics.value || "").trim()) analyze();
+  };
+  [els.optLower, els.optStripPunct, els.optKeepApos, els.optNumbers, els.optDedupLyrics].forEach(cb => {
+    cb.addEventListener("change", reanalyzeIfReady);
+  });
+
+  els.exportMissingBtn.addEventListener("click", exportMissingCsv);
+  els.exportFoundBtn.addEventListener("click", exportFoundCsv);
+})();
+</script>
+</body>
+</html>
