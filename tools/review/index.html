@@ -4,29 +4,77 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Rubric Row Feedback</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 14px; }
+    h1 { margin: 0 0 8px; font-size: 18px; }
+    p { margin: 6px 0 10px; max-width: 1100px; color: #cfcfcf; font-size: 13px; line-height: 1.35; }
+
+    textarea, select, button { font: inherit; }
+    #input { width: 100%; max-width: 1200px; border: 1px solid #2a2a2a; border-radius: 10px; padding: 10px; background: #0b0b0b; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 10px; }
+    button { padding: 7px 10px; border-radius: 10px; border: 1px solid #2a2a2a; background: #121212; cursor: pointer; }
+    button:hover { background: #171717; }
+    .status { margin: 10px 0 0; color: #bfbfbf; font-size: 13px; }
+
+    .tableWrap { margin-top: 12px; overflow: auto; border: 1px solid #242424; border-radius: 12px; }
+    table { border-collapse: collapse; width: 100%; min-width: 1050px; }
+    th, td { border-bottom: 1px solid #1f1f1f; padding: 8px; vertical-align: top; }
+    th { position: sticky; top: 0; background: #101010; text-align: left; font-weight: 600; font-size: 12px; color: #d6d6d6; }
+    td { font-size: 12px; color: #d6d6d6; }
+    tr:nth-child(even) td { background: #0e0e0e; }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; border: 1px solid #2a2a2a; background: #0b0b0b; font-size: 11px; color: #d6d6d6; }
+
+    /* Feedback cell: compact, all-in-one */
+    .fbCell { min-width: 190px; }
+    .fbTop { display: flex; gap: 6px; align-items: center; }
+    .sel { width: 120px; border-radius: 10px; border: 1px solid #2a2a2a; background: #0b0b0b; padding: 6px 8px; font-size: 12px; }
+    .why { margin-top: 6px; display: none; }
+    .why textarea {
+      width: 100%;
+      min-height: 52px;
+      resize: vertical;
+      border-radius: 10px;
+      border: 1px solid #2a2a2a;
+      background: #0b0b0b;
+      padding: 6px 8px;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    .reqOutline { border-color: #b88a2a !important; outline: 2px solid rgba(184,138,42,0.2); }
+    .rowErr td { box-shadow: inset 0 0 0 9999px rgba(184,42,42,0.07); }
+
+    .wFix { margin-left: auto; display: none; gap: 6px; align-items: center; }
+    .wFix .sel { width: 120px; }
+    .label { font-size: 11px; color: #a9a9a9; }
+  </style>
 </head>
 <body>
   <h1>Rubric Row Feedback</h1>
+  <p>
+    Paste TSV rows, Parse, then mark each field. “Why” only appears when you select <span class="pill">bad</span>.
+    Saved locally in this browser. CSV export requires all verdicts set, and why filled only for bad fields.
+  </p>
 
-  <p>Paste your rows (TSV recommended) and click Parse. Your feedback is saved locally in this browser.</p>
+  <textarea id="input" rows="8" placeholder="Paste rows here (tab-separated is best)"></textarea>
 
-  <textarea id="input" rows="10" cols="120" placeholder="Paste rows here (tab-separated is best)"></textarea>
-  <br />
-  <button id="parseBtn">Parse</button>
-  <button id="saveBtn">Save</button>
-  <button id="loadBtn">Load Saved</button>
-  <button id="clearBtn">Clear Saved</button>
-  <button id="exportBtn">Export CSV</button>
+  <div class="controls">
+    <button id="parseBtn">Parse</button>
+    <button id="saveBtn">Save</button>
+    <button id="loadBtn">Load Saved</button>
+    <button id="clearBtn">Clear Saved</button>
+    <button id="exportBtn">Export CSV</button>
+  </div>
 
-  <hr />
+  <div id="status" class="status"></div>
 
-  <div id="status"></div>
-
-  <div id="tableWrap"></div>
+  <div id="tableWrap" class="tableWrap"></div>
 
 <script>
 (function () {
-  const LS_KEY = "rubric_feedback_v1";
+  const LS_KEY = "rubric_feedback_v3";
 
   const els = {
     input: document.getElementById("input"),
@@ -39,105 +87,16 @@
     tableWrap: document.getElementById("tableWrap"),
   };
 
-  /** In-memory model:
-   * {
-   *   rows: [{
-   *     id, tag, description, weight, rationality, dep,
-   *     fb: {
-   *       tag: { verdict: "good"|"bad", why: "" },
-   *       description: { verdict, why },
-   *       weight: { verdict, why, corrected: "major"|"minor" },
-   *       rationality: { verdict, why }
-   *     }
-   *   }]
-   * }
-   */
+  // verdict: "" | "good" | "bad"
   let model = { rows: [] };
 
-  function setStatus(msg) {
-    els.status.textContent = msg || "";
-  }
-
-  function safeTrim(s) {
-    return (s == null) ? "" : String(s).trim();
-  }
+  function setStatus(msg) { els.status.textContent = msg || ""; }
+  function safeTrim(s) { return (s == null) ? "" : String(s).trim(); }
 
   function splitLine(line) {
-    // Prefer tabs. Fallback to 2+ spaces.
     let parts = line.split(/\t+/).map(safeTrim).filter(x => x !== "");
-    if (parts.length < 5) {
-      parts = line.split(/ {2,}/).map(safeTrim).filter(x => x !== "");
-    }
+    if (parts.length < 5) parts = line.split(/ {2,}/).map(safeTrim).filter(x => x !== "");
     return parts;
-  }
-
-  function parseInput(text) {
-    const lines = String(text || "")
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .split("\n")
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
-
-    const rows = [];
-
-    for (const line of lines) {
-      const parts = splitLine(line);
-
-      // Expected minimum: id tag description weight rationality
-      // dep is optional (last).
-      if (parts.length < 5) continue;
-
-      const id = safeTrim(parts[0]);
-      const tag = safeTrim(parts[1]);
-      const weight = safeTrim(parts[3]).toLowerCase();
-      const rationality = safeTrim(parts[4]);
-
-      // Description can contain separators if the paste was not strict TSV.
-      // If we have more than 6 parts, join the middle into description.
-      // Layout: 0 id, 1 tag, 2 description, 3 weight, 4 rationality, 5 dep (optional)
-      let description = safeTrim(parts[2]);
-      let dep = safeTrim(parts[5] || "");
-
-      if (parts.length > 6) {
-        // Join parts[2..parts.length-3] as description,
-        // keep last 2 as rationality + dep if possible.
-        // But rationality is already parts[4] for normal TSV, so only do this when input is messy.
-        // We will assume: id tag [description...] weight rationality [dep]
-        const last = parts[parts.length - 1];
-        const secondLast = parts[parts.length - 2];
-        const thirdLast = parts[parts.length - 3];
-
-        // Try to detect weight at thirdLast
-        const w = (thirdLast || "").toLowerCase();
-        if (w === "major" || w === "minor") {
-          description = parts.slice(2, parts.length - 3).join(" ");
-          dep = last;
-          // rationality becomes secondLast
-          // weight becomes thirdLast
-          // tag stays parts[1]
-          // id stays parts[0]
-          // overwrite:
-          // (we already stored weight and rationality earlier, so reassign local vars style)
-          // easiest: rebuild row below using these new values
-          const row = makeRow({
-            id,
-            tag,
-            description,
-            weight: w,
-            rationality: secondLast,
-            dep
-          });
-          rows.push(row);
-          continue;
-        }
-      }
-
-      const row = makeRow({ id, tag, description, weight, rationality, dep });
-      rows.push(row);
-    }
-
-    return rows;
   }
 
   function makeRow({ id, tag, description, weight, rationality, dep }) {
@@ -150,13 +109,74 @@
       rationality: safeTrim(rationality),
       dep: safeTrim(dep),
       fb: {
-        tag: { verdict: "good", why: "" },
-        description: { verdict: "good", why: "" },
-        weight: { verdict: "good", why: "", corrected: w },
-        rationality: { verdict: "good", why: "" },
+        tag: { verdict: "", why: "" },
+        description: { verdict: "", why: "" },
+        weight: { verdict: "", why: "", corrected: "" }, // corrected only used if weight verdict is bad
+        rationality: { verdict: "", why: "" },
       }
     };
   }
+
+  function parseInput(text) {
+    const lines = String(text || "")
+      .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+      .split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+    const rows = [];
+    for (const line of lines) {
+      const parts = splitLine(line);
+      if (parts.length < 5) continue;
+
+      const id = safeTrim(parts[0]);
+      const tag = safeTrim(parts[1]);
+
+      let description = safeTrim(parts[2]);
+      let weight = safeTrim(parts[3]).toLowerCase();
+      let rationality = safeTrim(parts[4]);
+      let dep = safeTrim(parts[5] || "");
+
+      if (parts.length > 6) {
+        // Attempt messy-line recovery: id tag [description...] weight rationality [dep]
+        const last = parts[parts.length - 1];
+        const secondLast = parts[parts.length - 2];
+        const thirdLast = parts[parts.length - 3];
+        const w = (thirdLast || "").toLowerCase();
+        if (w === "major" || w === "minor") {
+          description = parts.slice(2, parts.length - 3).join(" ");
+          weight = w;
+          rationality = secondLast;
+          dep = last;
+        }
+      }
+
+      rows.push(makeRow({ id, tag, description, weight, rationality, dep }));
+    }
+    return rows;
+  }
+
+  function autoSave() { try { localStorage.setItem(LS_KEY, JSON.stringify(model)); } catch (_) {} }
+
+  function saveToLocalStorage() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(model)); setStatus("Saved locally."); }
+    catch (e) { setStatus("Save failed: " + (e && e.message ? e.message : String(e))); }
+  }
+
+  function loadFromLocalStorage() {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) { setStatus("No saved data found."); return; }
+    try {
+      const loaded = JSON.parse(raw);
+      if (!loaded || !Array.isArray(loaded.rows)) { setStatus("Saved data is invalid."); return; }
+      model = loaded;
+      setStatus("Loaded saved data.");
+      render();
+      validateAll();
+    } catch (e) {
+      setStatus("Load failed: " + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  function clearLocalStorage() { localStorage.removeItem(LS_KEY); setStatus("Cleared saved data."); }
 
   function escapeCsv(v) {
     const s = String(v == null ? "" : v);
@@ -169,35 +189,100 @@
     const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
+    a.href = url; a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
   }
 
-  function render() {
-    if (!model.rows.length) {
-      els.tableWrap.innerHTML = "";
-      return;
+  function validateRow(row) {
+    const issues = []; // { field, type }
+
+    const fields = ["tag","description","weight","rationality"];
+    for (const f of fields) {
+      const verdict = row.fb[f].verdict || "";
+      if (verdict !== "good" && verdict !== "bad") {
+        issues.push({ field: f, type: "needsVerdict" });
+        continue;
+      }
+      if (verdict === "bad") {
+        const why = (row.fb[f].why || "").trim();
+        if (!why) issues.push({ field: f, type: "needsWhy" });
+      }
     }
 
+    if (row.fb.weight.verdict === "bad") {
+      const c = (row.fb.weight.corrected || "").trim().toLowerCase();
+      if (c !== "major" && c !== "minor") issues.push({ field: "weight", type: "needsCorrected" });
+    }
+
+    return issues;
+  }
+
+  function validateAll() {
+    let total = 0;
+    const rowEls = els.tableWrap.querySelectorAll("tbody tr");
+    rowEls.forEach(tr => tr.classList.remove("rowErr"));
+
+    model.rows.forEach((row, idx) => {
+      const issues = validateRow(row);
+      total += issues.length;
+
+      const tr = rowEls[idx];
+      if (!tr) return;
+
+      // clear outlines first
+      tr.querySelectorAll(".reqOutline").forEach(el => el.classList.remove("reqOutline"));
+
+      if (issues.length) tr.classList.add("rowErr");
+
+      issues.forEach(issue => {
+        const key = issue.field + "_" + issue.type;
+        const target = tr.querySelector('[data-issue="' + key + '"]');
+        if (target) target.classList.add("reqOutline");
+      });
+    });
+
+    return total;
+  }
+
+  function exportCsv() {
+    if (!model.rows.length) { setStatus("Nothing to export."); return; }
+    const errs = validateAll();
+    if (errs > 0) { setStatus("Fix required fields before export (" + errs + " issues highlighted)."); return; }
+
+    const headers = [
+      "id","tag","description","weight","rationality","dep",
+      "tag_verdict","tag_why",
+      "description_verdict","description_why",
+      "weight_verdict","weight_why","weight_corrected",
+      "rationality_verdict","rationality_why"
+    ];
+
+    const lines = [headers.map(escapeCsv).join(",")];
+    for (const r of model.rows) {
+      lines.push([
+        r.id, r.tag, r.description, r.weight, r.rationality, r.dep,
+        r.fb.tag.verdict, r.fb.tag.why,
+        r.fb.description.verdict, r.fb.description.why,
+        r.fb.weight.verdict, r.fb.weight.why, r.fb.weight.corrected,
+        r.fb.rationality.verdict, r.fb.rationality.why
+      ].map(escapeCsv).join(","));
+    }
+
+    download("rubric_feedback.csv", lines.join("\n"));
+    setStatus("Exported CSV.");
+  }
+
+  function render() {
+    if (!model.rows.length) { els.tableWrap.innerHTML = ""; return; }
+
     const table = document.createElement("table");
-    table.border = "1";
-    table.cellPadding = "6";
-    table.style.borderCollapse = "collapse";
-    table.style.width = "100%";
 
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
-    [
-      "id", "tag", "description", "weight", "rationality", "dep",
-      "tag fb", "tag why",
-      "desc fb", "desc why",
-      "weight fb", "weight why", "weight corrected",
-      "rational fb", "rational why"
-    ].forEach(h => {
+    ["id","tag","description","weight","rationality","dep","tag fb","desc fb","weight fb","rational fb"].forEach(h => {
       const th = document.createElement("th");
       th.textContent = h;
       hr.appendChild(th);
@@ -209,32 +294,17 @@
 
     model.rows.forEach((row, idx) => {
       const tr = document.createElement("tr");
-
-      function tdText(v) {
-        const td = document.createElement("td");
-        td.textContent = v;
-        return td;
-      }
-
-      tr.appendChild(tdText(row.id));
+      tr.appendChild(tdText(row.id, true));
       tr.appendChild(tdText(row.tag));
       tr.appendChild(tdText(row.description));
       tr.appendChild(tdText(row.weight));
       tr.appendChild(tdText(row.rationality));
       tr.appendChild(tdText(row.dep));
 
-      tr.appendChild(tdVerdictSelect(idx, "tag"));
-      tr.appendChild(tdWhyInput(idx, "tag"));
-
-      tr.appendChild(tdVerdictSelect(idx, "description"));
-      tr.appendChild(tdWhyInput(idx, "description"));
-
-      tr.appendChild(tdVerdictSelect(idx, "weight"));
-      tr.appendChild(tdWhyInput(idx, "weight"));
-      tr.appendChild(tdWeightCorrected(idx));
-
-      tr.appendChild(tdVerdictSelect(idx, "rationality"));
-      tr.appendChild(tdWhyInput(idx, "rationality"));
+      tr.appendChild(tdFbCell(idx, "tag"));
+      tr.appendChild(tdFbCell(idx, "description"));
+      tr.appendChild(tdFbCell(idx, "weight", true));
+      tr.appendChild(tdFbCell(idx, "rationality"));
 
       tbody.appendChild(tr);
     });
@@ -244,170 +314,139 @@
     els.tableWrap.appendChild(table);
   }
 
-  function tdVerdictSelect(rowIndex, field) {
+  function tdText(v, mono) {
     const td = document.createElement("td");
-    const sel = document.createElement("select");
-    const optGood = document.createElement("option");
-    optGood.value = "good";
-    optGood.textContent = "good";
-    const optBad = document.createElement("option");
-    optBad.value = "bad";
-    optBad.textContent = "bad";
-    sel.appendChild(optGood);
-    sel.appendChild(optBad);
+    if (mono) td.className = "mono";
+    td.textContent = v;
+    return td;
+  }
 
-    sel.value = model.rows[rowIndex].fb[field].verdict;
+  function makeVerdictSelect(current) {
+    const sel = document.createElement("select");
+    sel.className = "sel";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Select one";
+    const optG = document.createElement("option");
+    optG.value = "good"; optG.textContent = "good";
+    const optB = document.createElement("option");
+    optB.value = "bad"; optB.textContent = "bad";
+    sel.appendChild(opt0); sel.appendChild(optG); sel.appendChild(optB);
+    sel.value = current || "";
+    return sel;
+  }
+
+  function tdFbCell(rowIndex, field, isWeight) {
+    const td = document.createElement("td");
+    td.className = "fbCell";
+
+    const top = document.createElement("div");
+    top.className = "fbTop";
+
+    const sel = makeVerdictSelect(model.rows[rowIndex].fb[field].verdict);
+    sel.setAttribute("data-issue", field + "_needsVerdict");
+
+    const wFix = document.createElement("div");
+    wFix.className = "wFix";
+    if (isWeight) {
+      const lab = document.createElement("span");
+      lab.className = "label";
+      lab.textContent = "fix:";
+      const fixSel = document.createElement("select");
+      fixSel.className = "sel";
+      const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Select one";
+      const oMaj = document.createElement("option"); oMaj.value = "major"; oMaj.textContent = "major";
+      const oMin = document.createElement("option"); oMin.value = "minor"; oMin.textContent = "minor";
+      fixSel.appendChild(o0); fixSel.appendChild(oMaj); fixSel.appendChild(oMin);
+      fixSel.value = model.rows[rowIndex].fb.weight.corrected || "";
+      fixSel.setAttribute("data-issue", "weight_needsCorrected");
+
+      fixSel.addEventListener("change", () => {
+        model.rows[rowIndex].fb.weight.corrected = fixSel.value;
+        autoSave();
+        validateAll();
+      });
+
+      wFix.appendChild(lab);
+      wFix.appendChild(fixSel);
+    }
+
+    top.appendChild(sel);
+    if (isWeight) top.appendChild(wFix);
+
+    const whyWrap = document.createElement("div");
+    whyWrap.className = "why";
+
+    const why = document.createElement("textarea");
+    why.placeholder = "why";
+    why.value = model.rows[rowIndex].fb[field].why || "";
+    why.setAttribute("data-issue", field + "_needsWhy");
+    why.addEventListener("input", () => {
+      model.rows[rowIndex].fb[field].why = why.value;
+      autoSave();
+      validateAll();
+    });
+
+    whyWrap.appendChild(why);
+
+    function syncVisibility() {
+      const v = sel.value;
+      const showWhy = (v === "bad");
+      whyWrap.style.display = showWhy ? "block" : "none";
+
+      if (isWeight) {
+        wFix.style.display = showWhy ? "flex" : "none";
+        // if weight isn't bad, don't require corrected; keep stored value if present
+      }
+    }
 
     sel.addEventListener("change", () => {
       model.rows[rowIndex].fb[field].verdict = sel.value;
+      syncVisibility();
       autoSave();
+      validateAll();
     });
 
-    td.appendChild(sel);
+    // initial
+    syncVisibility();
+
+    td.appendChild(top);
+    td.appendChild(whyWrap);
     return td;
   }
 
-  function tdWhyInput(rowIndex, field) {
-    const td = document.createElement("td");
-    const ta = document.createElement("textarea");
-    ta.rows = 2;
-    ta.cols = 24;
-    ta.placeholder = "why";
-    ta.value = model.rows[rowIndex].fb[field].why || "";
-
-    ta.addEventListener("input", () => {
-      model.rows[rowIndex].fb[field].why = ta.value;
-      autoSave();
-    });
-
-    td.appendChild(ta);
-    return td;
-  }
-
-  function tdWeightCorrected(rowIndex) {
-    const td = document.createElement("td");
-    const sel = document.createElement("select");
-
-    const optMajor = document.createElement("option");
-    optMajor.value = "major";
-    optMajor.textContent = "major";
-    const optMinor = document.createElement("option");
-    optMinor.value = "minor";
-    optMinor.textContent = "minor";
-
-    sel.appendChild(optMajor);
-    sel.appendChild(optMinor);
-
-    sel.value = model.rows[rowIndex].fb.weight.corrected || model.rows[rowIndex].weight;
-
-    sel.addEventListener("change", () => {
-      model.rows[rowIndex].fb.weight.corrected = sel.value;
-      autoSave();
-    });
-
-    td.appendChild(sel);
-    return td;
-  }
-
-  function saveToLocalStorage() {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(model));
-      setStatus("Saved locally.");
-    } catch (e) {
-      setStatus("Save failed: " + (e && e.message ? e.message : String(e)));
-    }
-  }
-
-  function autoSave() {
-    // Quiet autosave, no status spam.
-    try { localStorage.setItem(LS_KEY, JSON.stringify(model)); } catch (_) {}
-  }
-
-  function loadFromLocalStorage() {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) {
-      setStatus("No saved data found.");
-      return;
-    }
-    try {
-      const loaded = JSON.parse(raw);
-      if (!loaded || !Array.isArray(loaded.rows)) {
-        setStatus("Saved data is invalid.");
-        return;
-      }
-      model = loaded;
-      setStatus("Loaded saved data.");
-      render();
-    } catch (e) {
-      setStatus("Load failed: " + (e && e.message ? e.message : String(e)));
-    }
-  }
-
-  function clearLocalStorage() {
-    localStorage.removeItem(LS_KEY);
-    setStatus("Cleared saved data.");
-  }
-
-  function exportCsv() {
-    if (!model.rows.length) {
-      setStatus("Nothing to export.");
-      return;
-    }
-
-    const headers = [
-      "id","tag","description","weight","rationality","dep",
-      "tag_verdict","tag_why",
-      "description_verdict","description_why",
-      "weight_verdict","weight_why","weight_corrected",
-      "rationality_verdict","rationality_why"
-    ];
-
-    const lines = [headers.map(escapeCsv).join(",")];
-
-    for (const r of model.rows) {
-      const row = [
-        r.id, r.tag, r.description, r.weight, r.rationality, r.dep,
-        r.fb.tag.verdict, r.fb.tag.why,
-        r.fb.description.verdict, r.fb.description.why,
-        r.fb.weight.verdict, r.fb.weight.why, r.fb.weight.corrected,
-        r.fb.rationality.verdict, r.fb.rationality.why
-      ];
-      lines.push(row.map(escapeCsv).join(","));
-    }
-
-    download("rubric_feedback.csv", lines.join("\n"));
-    setStatus("Exported CSV.");
-  }
-
+  // Wire buttons
   els.parseBtn.addEventListener("click", () => {
     const rows = parseInput(els.input.value);
-
     if (!rows.length) {
       model = { rows: [] };
       render();
-      setStatus("No rows parsed. Paste tab-separated rows (TSV) for best results.");
+      setStatus("No rows parsed. Paste TSV rows for best results.");
       return;
     }
 
-    // Try to merge with existing saved feedback by id if present.
+    // Merge feedback by id (preserve fb)
     const existingById = new Map();
     for (const r of model.rows) existingById.set(r.id, r);
 
     const merged = rows.map(r => {
       const old = existingById.get(r.id);
       if (!old) return r;
-
-      // Keep new base fields but preserve feedback.
       r.fb = old.fb || r.fb;
-      // If weight changed, keep corrected as-is but default to new weight if missing.
-      if (!r.fb.weight) r.fb.weight = { verdict: "good", why: "", corrected: r.weight };
-      if (!r.fb.weight.corrected) r.fb.weight.corrected = r.weight;
+
+      // normalize missing fields
+      if (!r.fb.tag) r.fb.tag = { verdict: "", why: "" };
+      if (!r.fb.description) r.fb.description = { verdict: "", why: "" };
+      if (!r.fb.rationality) r.fb.rationality = { verdict: "", why: "" };
+      if (!r.fb.weight) r.fb.weight = { verdict: "", why: "", corrected: "" };
+      if (typeof r.fb.weight.corrected !== "string") r.fb.weight.corrected = "";
       return r;
     });
 
     model = { rows: merged };
     render();
     autoSave();
+    validateAll();
     setStatus("Parsed " + merged.length + " rows.");
   });
 
@@ -416,7 +455,7 @@
   els.clearBtn.addEventListener("click", clearLocalStorage);
   els.exportBtn.addEventListener("click", exportCsv);
 
-  // Auto-load on open if present
+  // Auto-load on open
   loadFromLocalStorage();
 })();
 </script>
