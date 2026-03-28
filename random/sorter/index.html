@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sort / Sound / See</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #0a0a0c;
+  --bg-panel: #111114;
+  --bg-surface: #18181c;
+  --bg-hover: #222228;
+  --border: #2a2a32;
+  --text: #e8e6e3;
+  --text-dim: #8a8894;
+  --text-faint: #5a586a;
+  --accent: #6c5ce7;
+  --accent-dim: #4a3fb5;
+  --red: #e24b4a;
+  --green: #1d9e75;
+  --amber: #ef9f27;
+  --blue: #378add;
+  --cyan: #22d3ee;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-mono); overflow: hidden; }
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  gap: 0;
+}
+.app.cinematic {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+.app.cinematic .data-panel { display: none; }
+.app.cinematic .recording-area {
+  max-height: calc(100vh - 52px);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  gap: 12px;
+}
+.header h1 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  white-space: nowrap;
+}
+.header h1 span { color: var(--accent); }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.controls select, .controls button {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.controls select:hover, .controls button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-dim);
+}
+.controls button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+.controls button.primary:hover { background: var(--accent-dim); }
+.controls button.active { background: var(--red); border-color: var(--red); color: #fff; }
+.controls button.mode-active { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.slider-group label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 30px;
+}
+.slider-group input[type="range"] {
+  -webkit-appearance: none;
+  width: 70px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.slider-group .val {
+  font-size: 10px;
+  color: var(--text-dim);
+  min-width: 22px;
+  text-align: right;
+}
+.sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+.recording-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  padding: 12px;
+}
+.canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 6px;
+}
+.legend {
+  display: flex;
+  gap: 14px;
+  padding: 6px 16px 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 7px; height: 7px; border-radius: 2px; }
+
+.data-panel {
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 0;
+}
+.panel-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-section:last-child { border-bottom: none; }
+.section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.stat-card {
+  background: var(--bg-surface);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.stat-card .stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--font-display);
+  color: var(--text);
+  line-height: 1.2;
+}
+.stat-card .stat-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.stat-card.wide { grid-column: 1 / -1; }
+.stat-card .stat-bar-wrap {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.stat-card .stat-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+  width: 0%;
+}
+
+.algo-info h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.algo-info .complexity {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 10px;
+}
+.algo-info .complexity span { color: var(--text-dim); }
+.algo-info .complexity code { color: var(--cyan); font-family: var(--font-mono); }
+.algo-info .description {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.sound-info .engine-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.sound-info .engine-desc {
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.sound-info .mapping-table {
+  width: 100%;
+  font-size: 10px;
+  border-collapse: collapse;
+}
+.sound-info .mapping-table th {
+  text-align: left;
+  color: var(--text-faint);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 9px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sound-info .mapping-table td {
+  padding: 3px 0;
+  color: var(--text-dim);
+}
+.sound-info .mapping-table td code {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.sf2-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-surface);
+  border-radius: 5px;
+  font-size: 10px;
+  margin-top: 6px;
+}
+.sf2-status .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sf2-status .dot.active { background: var(--green); }
+.sf2-status .dot.inactive { background: var(--text-faint); }
+.sf2-status span { color: var(--text-dim); }
+.sf2-drop {
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  padding: 10px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  margin-top: 6px;
+}
+.sf2-drop:hover, .sf2-drop.dragover {
+  border-color: var(--accent);
+  color: var(--text-dim);
+}
+.sf2-instruments { margin-top: 6px; }
+.sf2-instruments select {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.sf2-instruments select:hover { border-color: var(--accent-dim); }
+.sf2-instruments .inst-label {
+  font-size: 9px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.sf2-inst-count {
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+.waveform-canvas {
+  width: 100%;
+  height: 40px;
+  display: block;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+
+.data-panel::-webkit-scrollbar { width: 5px; }
+.data-panel::-webkit-scrollbar-track { background: transparent; }
+.data-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <h1><span>/</span> sort <span>/</span> sound <span>/</span> see</h1>
+    <div class="controls">
+      <select id="algo">
+        <option value="bubble">Bubble</option>
+        <option value="selection">Selection</option>
+        <option value="insertion">Insertion</option>
+        <option value="merge">Merge</option>
+        <option value="quick">Quick</option>
+        <option value="heap">Heap</option>
+        <option value="radix">Radix</option>
+        <option value="shell">Shell</option>
+        <option value="cocktail">Cocktail</option>
+        <option value="comb">Comb</option>
+        <option value="gnome">Gnome</option>
+        <option value="bogo">Bogo</option>
+      </select>
+      <div class="slider-group">
+        <label>Bars</label>
+        <input type="range" min="8" max="300" value="100" id="countSlider" step="1">
+        <span class="val" id="countVal">100</span>
+      </div>
+      <div class="slider-group">
+        <label>Speed</label>
+        <input type="range" min="1" max="100" value="50" id="speedSlider" step="1">
+      </div>
+      <div class="slider-group">
+        <label>Vol</label>
+        <input type="range" min="0" max="100" value="40" id="volSlider" step="1">
+      </div>
+      <div class="sep"></div>
+      <select id="waveform">
+        <option value="sine">Sine</option>
+        <option value="triangle">Triangle</option>
+        <option value="sawtooth">Sawtooth</option>
+        <option value="square">Square</option>
+        <option value="fm">FM Synth</option>
+        <option value="sf2">SoundFont</option>
+      </select>
+      <div class="sep"></div>
+      <button class="primary" id="startBtn">Start</button>
+      <button id="shuffleBtn">Shuffle</button>
+      <button id="reverseBtn">Reverse</button>
+      <div class="sep"></div>
+      <button id="orientBtn" title="Toggle horizontal bars">Horiz</button>
+      <button id="cinemaBtn" title="16:9 cinematic mode (hides data panel)">16:9</button>
+    </div>
+  </div>
+
+  <div class="recording-area">
+    <div class="canvas-wrap"><canvas id="canvas"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div> Default</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red);"></div> Comparing</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Sorted</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--amber);"></div> Pivot</div>
+    </div>
+  </div>
+
+  <div class="data-panel">
+    <div class="panel-section">
+      <div class="section-label">Live stats</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="compCount">0</div><div class="stat-label">Comparisons</div></div>
+        <div class="stat-card"><div class="stat-value" id="swapCount">0</div><div class="stat-label">Swaps</div></div>
+        <div class="stat-card"><div class="stat-value" id="elapsed">0.0s</div><div class="stat-label">Elapsed</div></div>
+        <div class="stat-card"><div class="stat-value" id="arrayAccess">0</div><div class="stat-label">Array reads</div></div>
+        <div class="stat-card wide">
+          <div class="stat-value" id="progressPct">0%</div>
+          <div class="stat-label">Progress</div>
+          <div class="stat-bar-wrap"><div class="stat-bar" id="progressBar"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-section algo-info" id="algoInfo"></div>
+    <div class="panel-section sound-info" id="soundInfo">
+      <div class="section-label">Sound engine</div>
+      <div class="engine-label" id="engineLabel">Sine oscillator</div>
+      <div class="engine-desc" id="engineDesc">Each bar maps to a frequency between 120Hz and 1320Hz.</div>
+      <table class="mapping-table">
+        <thead><tr><th>Event</th><th>Sound</th></tr></thead>
+        <tbody>
+          <tr><td>Compare</td><td><code id="sndCompare">50ms tone at bar freq</code></td></tr>
+          <tr><td>Swap</td><td><code id="sndSwap">60ms tone, decay</code></td></tr>
+          <tr><td>Sorted</td><td><code id="sndSorted">30ms chirp</code></td></tr>
+          <tr><td>Sweep</td><td><code id="sndSweep">Ascending scale</code></td></tr>
+        </tbody>
+      </table>
+      <div class="section-label" style="margin-top:10px;">Waveform</div>
+      <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
+      <div class="section-label" style="margin-top:10px;">SoundFont (.sf2)</div>
+      <div class="sf2-status">
+        <div class="dot inactive" id="sf2Dot"></div>
+        <span id="sf2Label">No soundfont loaded</span>
+      </div>
+      <div class="sf2-drop" id="sf2Drop">
+        Drop .sf2 file here or click to browse
+        <input type="file" accept=".sf2" id="sf2Input" style="display:none;">
+      </div>
+      <div class="sf2-instruments" id="sf2Instruments" style="display:none;">
+        <div class="inst-label">Instrument / Preset</div>
+        <select id="sf2PresetSelect"></select>
+        <div class="sf2-inst-count" id="sf2InstCount"></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="section-label">How the sound mapping works</div>
+      <div class="algo-info">
+        <div class="description">
+          <strong style="color:var(--text);">Pitch mapping:</strong> Each bar (1 to N) maps linearly. <code style="color:var(--cyan);font-size:10px;">freq = 120 + (value/total) * 1200</code>
+          <br><br>
+          <strong style="color:var(--text);">Oscillators:</strong> Sine = pure. Triangle = warm harmonics. Sawtooth = bright, all harmonics. Square = hollow/retro. FM = carrier modulated at 2x for bell tones.
+          <br><br>
+          <strong style="color:var(--text);">SoundFont mode:</strong> Bar values map to MIDI 36-96 (C2-C7). The SF2 parser reads RIFF/sfbk structure, locates instrument headers (inst), instrument bags (ibag), generators (igen, oper 53 = sampleID), and sample headers (shdr) to extract per-instrument PCM data. Each instrument gets its own audio buffer with the correct sample rate and original pitch for accurate playback rate shifting.
+          <br><br>
+          <strong style="color:var(--text);">Multi-instrument SF2:</strong> The parser walks the inst chunk to find all instruments, follows the ibag/igen chain to resolve which sample each instrument references, then extracts that sample region from the smpl chunk. The instrument selector lets you switch between them live. Falls back to raw sample enumeration if the inst chain is missing or malformed.
+          <br><br>
+          <strong style="color:var(--text);">Why it sounds musical:</strong> As sorting progresses, nearby bars converge to similar values, producing melodic runs. The completion sweep plays every bar in order for a clean ascending scale.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ALGO_DATA = {
+  bubble: { name: 'Bubble sort', best: 'O(n)', avg: 'O(n\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: true, desc: 'Repeatedly compares adjacent elements, swapping if out of order. Smaller values "bubble" up. Simple but O(n\u00B2).' },
+  selection: { name: 'Selection sort', best: 'O(n\u00B2)', avg: 'O(n\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: false, desc: 'Finds minimum from unsorted portion, places it at front. Always same comparisons. Minimizes swaps.' },
+  insertion: { name: 'Insertion sort', best: 'O(n)', avg: 'O(n\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: true, desc: 'Builds sorted array one element at a time. Efficient on small/nearly-sorted data. Base case in Timsort.' },
+  merge: { name: 'Merge sort', best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)', space: 'O(n)', stable: true, desc: 'Recursive divide-and-conquer. Splits array, sorts halves, merges them. Guaranteed O(n log n).' },
+  quick: { name: 'Quick sort', best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n\u00B2)', space: 'O(log n)', stable: false, desc: 'Partitions around pivot (last element). Less-than left, greater right. Fast average, degrades on sorted input.' },
+  heap: { name: 'Heap sort', best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)', space: 'O(1)', stable: false, desc: 'Builds max-heap, extracts maximum repeatedly. Consistent O(n log n) in-place. Poor cache locality.' },
+  radix: { name: 'Radix sort', best: 'O(nk)', avg: 'O(nk)', worst: 'O(nk)', space: 'O(n+k)', stable: true, desc: 'Non-comparison sort by digit. Dramatic visual sweep patterns as digits redistribute.' },
+  shell: { name: 'Shell sort', best: 'O(n log n)', avg: 'O(n\u00B3\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: false, desc: 'Insertion sort with shrinking gap. Elements move toward position faster. Gap: N/2, N/4... 1.' },
+  cocktail: { name: 'Cocktail shaker', best: 'O(n)', avg: 'O(n\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: true, desc: 'Bidirectional bubble sort. Bouncing wave pattern as it alternates direction.' },
+  comb: { name: 'Comb sort', best: 'O(n log n)', avg: 'O(n\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: false, desc: 'Bubble sort with shrinking gap (factor 1.3). Kills "turtles" early.' },
+  gnome: { name: 'Gnome sort', best: 'O(n)', avg: 'O(n\u00B2)', worst: 'O(n\u00B2)', space: 'O(1)', stable: true, desc: 'Garden gnome method: forward if ordered, backward swap if not. Simplest possible sort.' },
+  bogo: { name: 'Bogo sort', best: 'O(n)', avg: 'O((n+1)!)', worst: '\u221E', space: 'O(1)', stable: false, desc: 'Random shuffle until sorted. Expected O((n+1)!). Keep bars under 8.' }
+};
+
+const ENGINE_DATA = {
+  sine: { label: 'Sine oscillator', desc: 'Pure tone, no harmonics. Clean baseline for hearing pitch mapping.' },
+  triangle: { label: 'Triangle wave', desc: 'Odd harmonics at 1/n\u00B2. Warm, muted, flute-like.' },
+  sawtooth: { label: 'Sawtooth wave', desc: 'All harmonics at 1/n. Bright, buzzy, classic synth.' },
+  square: { label: 'Square wave', desc: 'Odd harmonics at 1/n. Hollow, retro, NES/chiptune.' },
+  fm: { label: 'FM synthesis', desc: 'Carrier modulated at 2x frequency, index 200. Bell-like metallic tones.' },
+  sf2: { label: 'SoundFont (.sf2)', desc: 'Sampled instruments. Bar values map to MIDI 36-96. Falls back to FM if none loaded.' }
+};
+
+let arr = [], states = [], sorting = false;
+let comparisons = 0, swapCnt = 0, arrayReads = 0;
+let startTime = 0, timerInterval = null;
+let audioCtx = null, analyser = null, analyserData = null;
+let horizontal = false;
+let sf2Loaded = false, sf2Presets = [], sf2ActivePreset = 0;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wfCanvas = document.getElementById('waveformCanvas');
+const wfCtx = wfCanvas.getContext('2d');
+
+const $ = id => document.getElementById(id);
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyserData = new Uint8Array(analyser.frequencyBinCount);
+    analyser.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function freqFromVal(v, n) { return 120 + (v / n) * 1200; }
+function midiFromVal(v, n) { return Math.round(36 + (v / n) * 60); }
+
+function playTone(val, n, dur) {
+  if (!audioCtx) return;
+  const vol = $('volSlider').value / 100;
+  if (vol === 0) return;
+  const mode = $('waveform').value;
+  const freq = freqFromVal(val, n);
+  if (mode === 'sf2' && sf2Loaded && sf2Presets.length > 0) { playSF2Note(midiFromVal(val, n), dur, vol); return; }
+  if (mode === 'fm' || (mode === 'sf2' && !sf2Loaded)) { playFM(freq, dur, vol); return; }
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = mode;
+  osc.frequency.value = freq;
+  gain.gain.value = vol * 0.08;
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain); gain.connect(analyser);
+  osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+function playFM(freq, dur, vol) {
+  const car = audioCtx.createOscillator(), mod = audioCtx.createOscillator();
+  const mG = audioCtx.createGain(), oG = audioCtx.createGain();
+  car.frequency.value = freq; mod.frequency.value = freq * 2;
+  mG.gain.value = 200; oG.gain.value = vol * 0.06;
+  oG.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  mod.connect(mG); mG.connect(car.frequency); car.connect(oG); oG.connect(analyser);
+  car.start(); mod.start();
+  car.stop(audioCtx.currentTime + dur); mod.stop(audioCtx.currentTime + dur);
+}
+
+function playSF2Note(midi, dur, vol) {
+  const preset = sf2Presets[sf2ActivePreset];
+  if (!preset || !preset.buffer) return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = preset.buffer;
+  src.playbackRate.value = Math.pow(2, (midi - (preset.originalPitch || 60)) / 12);
+  const gain = audioCtx.createGain();
+  gain.gain.value = vol * 0.15;
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  src.connect(gain); gain.connect(analyser);
+  src.start(audioCtx.currentTime, 0, dur * 2);
+}
+
+// SF2 Parser
+async function loadSF2(file) {
+  try {
+    initAudio();
+    const ab = await file.arrayBuffer();
+    const parsed = parseSF2(ab);
+    if (parsed && parsed.length > 0) {
+      sf2Presets = parsed; sf2Loaded = true; sf2ActivePreset = 0;
+      $('sf2Dot').className = 'dot active';
+      $('sf2Label').textContent = file.name;
+      populatePresetSelector();
+      $('waveform').value = 'sf2';
+      updateSoundInfo();
+    } else {
+      $('sf2Label').textContent = 'No usable samples found';
+    }
+  } catch(e) {
+    $('sf2Label').textContent = 'Error: ' + e.message;
+  }
+}
+
+function parseSF2(ab) {
+  const view = new DataView(ab);
+  const dec = new TextDecoder('ascii');
+  const results = [];
+  function tag(o) { return dec.decode(new Uint8Array(ab, o, 4)); }
+  function u32(o) { return view.getUint32(o, true); }
+  function u16(o) { return view.getUint16(o, true); }
+  if (tag(0) !== 'RIFF' || tag(8) !== 'sfbk') return null;
+
+  let sdtaOff = -1, sdtaSize = 0, pdtaOff = -1, pdtaSize = 0, smplData = null;
+  let pos = 12;
+  while (pos < ab.byteLength - 8) {
+    const t = tag(pos), sz = u32(pos + 4);
+    if (t === 'LIST') {
+      const lt = tag(pos + 8);
+      if (lt === 'sdta') { sdtaOff = pos + 12; sdtaSize = sz - 4; }
+      if (lt === 'pdta') { pdtaOff = pos + 12; pdtaSize = sz - 4; }
+    }
+    pos += 8 + sz; if (sz % 2) pos++;
+  }
+
+  if (sdtaOff >= 0) {
+    let p = sdtaOff;
+    while (p < sdtaOff + sdtaSize - 8) {
+      const ct = tag(p), cs = u32(p + 4);
+      if (ct === 'smpl') smplData = new Int16Array(ab, p + 8, cs / 2);
+      p += 8 + cs; if (cs % 2) p++;
+    }
+  }
+  if (!smplData) return null;
+
+  let phdrOff=-1,phdrSize=0,instOff=-1,instSize=0,ibagOff=-1,ibagSize=0,igenOff=-1,igenSize=0,shdrOff=-1,shdrSize=0;
+  if (pdtaOff >= 0) {
+    let p = pdtaOff;
+    while (p < pdtaOff + pdtaSize - 8) {
+      const ct = tag(p), cs = u32(p + 4);
+      if(ct==='phdr'){phdrOff=p+8;phdrSize=cs;}
+      if(ct==='inst'){instOff=p+8;instSize=cs;}
+      if(ct==='ibag'){ibagOff=p+8;ibagSize=cs;}
+      if(ct==='igen'){igenOff=p+8;igenSize=cs;}
+      if(ct==='shdr'){shdrOff=p+8;shdrSize=cs;}
+      p += 8 + cs; if (cs % 2) p++;
+    }
+  }
+
+  const samples = [];
+  if (shdrOff >= 0) {
+    const num = Math.floor(shdrSize / 46);
+    for (let i = 0; i < num; i++) {
+      const o = shdrOff + i * 46;
+      let name = '';
+      for (let j = 0; j < 20; j++) { const ch = view.getUint8(o+j); if(!ch) break; name += String.fromCharCode(ch); }
+      samples.push({
+        name, start: u32(o+20), end: u32(o+24),
+        sampleRate: u32(o+36), originalPitch: view.getUint8(o+40), sampleType: u16(o+44)
+      });
+    }
+  }
+
+  const instruments = [];
+  if (instOff >= 0) {
+    const num = Math.floor(instSize / 22);
+    for (let i = 0; i < num; i++) {
+      const o = instOff + i * 22;
+      let name = '';
+      for (let j = 0; j < 20; j++) { const ch = view.getUint8(o+j); if(!ch) break; name += String.fromCharCode(ch); }
+      instruments.push({ name, bagNdx: u16(o+20) });
+    }
+  }
+
+  const ibags = [];
+  if (ibagOff >= 0) {
+    const num = Math.floor(ibagSize / 4);
+    for (let i = 0; i < num; i++) ibags.push({ genNdx: u16(ibagOff+i*4), modNdx: u16(ibagOff+i*4+2) });
+  }
+
+  const igens = [];
+  if (igenOff >= 0) {
+    const num = Math.floor(igenSize / 4);
+    for (let i = 0; i < num; i++) igens.push({ oper: u16(igenOff+i*4), amount: u16(igenOff+i*4+2) });
+  }
+
+  for (let i = 0; i < instruments.length - 1; i++) {
+    const inst = instruments[i];
+    const nextBag = instruments[i+1].bagNdx;
+    let sampleIdx = -1;
+    for (let b = inst.bagNdx; b < nextBag && b < ibags.length - 1; b++) {
+      const gs = ibags[b].genNdx, ge = ibags[b+1].genNdx;
+      for (let g = gs; g < ge && g < igens.length; g++) {
+        if (igens[g].oper === 53) sampleIdx = igens[g].amount;
+      }
+    }
+    if (sampleIdx >= 0 && sampleIdx < samples.length) {
+      const smp = samples[sampleIdx];
+      if (smp.start < smp.end && smp.end <= smplData.length && !(smp.sampleType & 0x8000)) {
+        const len = smp.end - smp.start;
+        const buf = audioCtx.createBuffer(1, len, smp.sampleRate || 44100);
+        const ch = buf.getChannelData(0);
+        for (let s = 0; s < len; s++) ch[s] = smplData[smp.start + s] / 32768;
+        results.push({
+          name: inst.name.trim() || smp.name.trim() || ('Instrument ' + i),
+          buffer: buf,
+          originalPitch: smp.originalPitch < 128 ? smp.originalPitch : 60,
+          sampleRate: smp.sampleRate || 44100
+        });
+      }
+    }
+  }
+
+  if (results.length === 0) {
+    for (let i = 0; i < samples.length; i++) {
+      const smp = samples[i];
+      if ((smp.sampleType === 0 || smp.sampleType === 1) && smp.start < smp.end && smp.end <= smplData.length) {
+        const len = smp.end - smp.start;
+        if (len < 100) continue;
+        const buf = audioCtx.createBuffer(1, len, smp.sampleRate || 44100);
+        const ch = buf.getChannelData(0);
+        for (let s = 0; s < len; s++) ch[s] = smplData[smp.start + s] / 32768;
+        results.push({
+          name: smp.name.trim() || ('Sample ' + i), buffer: buf,
+          originalPitch: smp.originalPitch < 128 ? smp.originalPitch : 60
+        });
+      }
+    }
+  }
+
+  const seen = new Set(), deduped = [];
+  for (const r of results) { if (!seen.has(r.name)) { seen.add(r.name); deduped.push(r); } }
+  return deduped;
+}
+
+function populatePresetSelector() {
+  const sel = $('sf2PresetSelect');
+  sel.innerHTML = '';
+  sf2Presets.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = (i + 1) + '. ' + p.name;
+    sel.appendChild(opt);
+  });
+  $('sf2Instruments').style.display = 'block';
+  $('sf2InstCount').textContent = sf2Presets.length + ' instruments found';
+  sel.onchange = () => { sf2ActivePreset = parseInt(sel.value); };
+}
+
+// Waveform display
+function drawWaveform() {
+  if (!analyser) { requestAnimationFrame(drawWaveform); return; }
+  const rect = wfCanvas.getBoundingClientRect();
+  if (!rect.width) { requestAnimationFrame(drawWaveform); return; }
+  wfCanvas.width = rect.width * devicePixelRatio;
+  wfCanvas.height = rect.height * devicePixelRatio;
+  wfCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  analyser.getByteTimeDomainData(analyserData);
+  wfCtx.clearRect(0, 0, rect.width, rect.height);
+  wfCtx.strokeStyle = '#6c5ce7';
+  wfCtx.lineWidth = 1.5;
+  wfCtx.beginPath();
+  const sw = rect.width / analyserData.length;
+  let x = 0;
+  for (let i = 0; i < analyserData.length; i++) {
+    const y = (analyserData[i] / 128) * rect.height / 2;
+    i === 0 ? wfCtx.moveTo(x, y) : wfCtx.lineTo(x, y);
+    x += sw;
+  }
+  wfCtx.stroke();
+  requestAnimationFrame(drawWaveform);
+}
+
+// Main canvas
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+
+function draw() {
+  const w = canvas.width / devicePixelRatio, h = canvas.height / devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  const n = arr.length;
+  if (!n) return;
+
+  if (horizontal) {
+    const barH = Math.max(1, (h - 4) / n);
+    const pad = 24;
+    for (let i = 0; i < n; i++) {
+      const barW = (arr[i] / n) * (w - pad);
+      const y = 2 + i * barH;
+      const hue = (arr[i] / n) * 220;
+      ctx.fillStyle = states[i] === 'comparing' ? '#e24b4a' : states[i] === 'sorted' ? '#1d9e75' : states[i] === 'pivot' ? '#ef9f27' : `hsl(${hue},70%,55%)`;
+      ctx.fillRect(0, y, barW, barH > 2 ? barH - 0.5 : barH);
+    }
+  } else {
+    const barW = Math.max(1, (w - 4) / n);
+    const pad = 24;
+    for (let i = 0; i < n; i++) {
+      const barH = (arr[i] / n) * (h - pad);
+      const x = 2 + i * barW;
+      const hue = (arr[i] / n) * 220;
+      ctx.fillStyle = states[i] === 'comparing' ? '#e24b4a' : states[i] === 'sorted' ? '#1d9e75' : states[i] === 'pivot' ? '#ef9f27' : `hsl(${hue},70%,55%)`;
+      ctx.fillRect(x, h - barH, barW > 2 ? barW - 0.5 : barW, barH);
+    }
+  }
+}
+
+function initArr() {
+  const n = parseInt($('countSlider').value);
+  arr = Array.from({length: n}, (_, i) => i + 1);
+  states = new Array(n).fill('default');
+  resetStats(); shuffleArr();
+}
+
+function shuffleArr() {
+  if (sorting) return;
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  states.fill('default'); resetStats(); draw();
+}
+
+function reverseArr() {
+  if (sorting) return;
+  arr = Array.from({length: arr.length}, (_, i) => arr.length - i);
+  states.fill('default'); resetStats(); draw();
+}
+
+function resetStats() {
+  comparisons = 0; swapCnt = 0; arrayReads = 0;
+  $('compCount').textContent = '0'; $('swapCount').textContent = '0';
+  $('arrayAccess').textContent = '0'; $('elapsed').textContent = '0.0s';
+  $('progressPct').textContent = '0%'; $('progressBar').style.width = '0%';
+}
+
+function updateStats() {
+  $('compCount').textContent = comparisons.toLocaleString();
+  $('swapCount').textContent = swapCnt.toLocaleString();
+  $('arrayAccess').textContent = arrayReads.toLocaleString();
+  let s = 0; for (let i = 0; i < arr.length; i++) if (states[i] === 'sorted') s++;
+  const pct = Math.round((s / arr.length) * 100);
+  $('progressPct').textContent = pct + '%'; $('progressBar').style.width = pct + '%';
+}
+
+function getDelay() { return Math.max(0, 100 - $('speedSlider').value); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function compare(i, j) {
+  if (!sorting) throw 'stopped';
+  comparisons++; arrayReads += 2;
+  states[i] = 'comparing'; states[j] = 'comparing';
+  playTone(arr[i], arr.length, 0.05);
+  draw(); updateStats();
+  const d = getDelay(); if (d > 0) await sleep(d);
+  states[i] = 'default'; states[j] = 'default';
+}
+
+async function doSwap(i, j) {
+  swapCnt++; arrayReads += 2;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  playTone(arr[j], arr.length, 0.06);
+  updateStats();
+}
+
+async function markSorted(i) {
+  states[i] = 'sorted';
+  playTone(arr[i], arr.length, 0.03);
+}
+
+// All sorting algorithms
+async function bubbleSort(){const n=arr.length;for(let i=0;i<n-1;i++){for(let j=0;j<n-i-1;j++){await compare(j,j+1);if(arr[j]>arr[j+1])await doSwap(j,j+1);}await markSorted(n-1-i);}await markSorted(0);}
+async function selectionSort(){const n=arr.length;for(let i=0;i<n-1;i++){let m=i;states[i]='pivot';draw();for(let j=i+1;j<n;j++){await compare(j,m);if(arr[j]<arr[m])m=j;}states[i]='default';if(m!==i)await doSwap(i,m);await markSorted(i);}await markSorted(arr.length-1);}
+async function insertionSort(){const n=arr.length;await markSorted(0);for(let i=1;i<n;i++){let j=i;states[j]='pivot';draw();while(j>0){await compare(j,j-1);if(arr[j]<arr[j-1]){await doSwap(j,j-1);j--;}else break;}for(let k=0;k<=i;k++)await markSorted(k);}}
+
+async function mergeSort(){
+  async function mg(l,m,r){const L=arr.slice(l,m+1),R=arr.slice(m+1,r+1);arrayReads+=(r-l+1);let i=0,j=0,k=l;while(i<L.length&&j<R.length){await compare(k,k);if(L[i]<=R[j]){arr[k]=L[i];i++;}else{arr[k]=R[j];j++;swapCnt++;}playTone(arr[k],arr.length,0.04);draw();updateStats();k++;}while(i<L.length){arr[k]=L[i];i++;k++;draw();}while(j<R.length){arr[k]=R[j];j++;k++;draw();}}
+  async function s(l,r){if(!sorting)throw'stopped';if(l<r){const m=Math.floor((l+r)/2);await s(l,m);await s(m+1,r);await mg(l,m,r);}}
+  await s(0,arr.length-1);for(let i=0;i<arr.length;i++)await markSorted(i);
+}
+
+async function quickSort(){
+  async function pt(lo,hi){const pv=arr[hi];states[hi]='pivot';draw();let i=lo-1;for(let j=lo;j<hi;j++){await compare(j,hi);if(arr[j]<pv){i++;await doSwap(i,j);}}await doSwap(i+1,hi);states[hi]='default';await markSorted(i+1);return i+1;}
+  async function s(lo,hi){if(!sorting)throw'stopped';if(lo<hi){const p=await pt(lo,hi);await s(lo,p-1);await s(p+1,hi);}else if(lo===hi)await markSorted(lo);}
+  await s(0,arr.length-1);
+}
+
+async function heapSort(){const n=arr.length;async function hf(sz,i){let lg=i;const l=2*i+1,r=2*i+2;if(l<sz){await compare(l,lg);if(arr[l]>arr[lg])lg=l;}if(r<sz){await compare(r,lg);if(arr[r]>arr[lg])lg=r;}if(lg!==i){await doSwap(i,lg);await hf(sz,lg);}}for(let i=Math.floor(n/2)-1;i>=0;i--)await hf(n,i);for(let i=n-1;i>0;i--){await doSwap(0,i);await markSorted(i);await hf(i,0);}await markSorted(0);}
+
+async function radixSort(){const n=arr.length;const mx=Math.max(...arr);for(let exp=1;Math.floor(mx/exp)>0;exp*=10){const out=new Array(n),cnt=new Array(10).fill(0);for(let i=0;i<n;i++){states[i]='comparing';draw();const d=getDelay();if(d>0)await sleep(d/2);playTone(arr[i],n,0.03);comparisons++;arrayReads++;updateStats();cnt[Math.floor(arr[i]/exp)%10]++;states[i]='default';}for(let i=1;i<10;i++)cnt[i]+=cnt[i-1];for(let i=n-1;i>=0;i--){const d=Math.floor(arr[i]/exp)%10;out[cnt[d]-1]=arr[i];cnt[d]--;arrayReads++;}for(let i=0;i<n;i++){if(!sorting)throw'stopped';arr[i]=out[i];states[i]='pivot';draw();playTone(arr[i],n,0.03);const d=getDelay();if(d>0)await sleep(d/2);states[i]='default';swapCnt++;updateStats();}draw();}for(let i=0;i<n;i++)await markSorted(i);}
+
+async function shellSort(){const n=arr.length;for(let gap=Math.floor(n/2);gap>0;gap=Math.floor(gap/2)){for(let i=gap;i<n;i++){let j=i;states[j]='pivot';draw();while(j>=gap){await compare(j,j-gap);if(arr[j]<arr[j-gap]){await doSwap(j,j-gap);j-=gap;}else break;}states[j]='default';}}for(let i=0;i<arr.length;i++)await markSorted(i);}
+
+async function cocktailSort(){const n=arr.length;let sw=true,st=0,en=n-1;while(sw){sw=false;for(let i=st;i<en;i++){await compare(i,i+1);if(arr[i]>arr[i+1]){await doSwap(i,i+1);sw=true;}}await markSorted(en);en--;if(!sw)break;sw=false;for(let i=en;i>st;i--){await compare(i,i-1);if(arr[i]<arr[i-1]){await doSwap(i,i-1);sw=true;}}await markSorted(st);st++;}for(let i=st;i<=en;i++)await markSorted(i);}
+
+async function combSort(){const n=arr.length;let gap=n,sd=false;while(!sd){gap=Math.floor(gap/1.3);if(gap<=1){gap=1;sd=true;}for(let i=0;i+gap<n;i++){await compare(i,i+gap);if(arr[i]>arr[i+gap]){await doSwap(i,i+gap);sd=false;}}}for(let i=0;i<n;i++)await markSorted(i);}
+
+async function gnomeSort(){const n=arr.length;let i=0;while(i<n){if(!sorting)throw'stopped';if(i===0||arr[i]>=arr[i-1]){if(i>0)await markSorted(i-1);i++;}else{await compare(i,i-1);await doSwap(i,i-1);i--;}}for(let j=0;j<n;j++)await markSorted(j);}
+
+async function bogoSort(){function ok(){for(let i=1;i<arr.length;i++){arrayReads+=2;comparisons++;if(arr[i]<arr[i-1])return false;}return true;}let at=0;while(!ok()){if(!sorting)throw'stopped';at++;for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];swapCnt++;}states.fill('comparing');playTone(arr[Math.floor(Math.random()*arr.length)],arr.length,0.03);draw();updateStats();await sleep(Math.max(1,getDelay()/4));states.fill('default');if(at>100000)break;}for(let i=0;i<arr.length;i++)await markSorted(i);}
+
+const algorithms = {bubble:bubbleSort,selection:selectionSort,insertion:insertionSort,merge:mergeSort,quick:quickSort,heap:heapSort,radix:radixSort,shell:shellSort,cocktail:cocktailSort,comb:combSort,gnome:gnomeSort,bogo:bogoSort};
+
+async function completionSweep() {
+  for (let i = 0; i < arr.length; i++) {
+    states[i] = 'sorted';
+    playTone(arr[i], arr.length, 0.025);
+    draw();
+    await sleep(Math.max(2, 500 / arr.length));
+  }
+}
+
+async function start() {
+  if (sorting) { sorting = false; $('startBtn').textContent = 'Start'; $('startBtn').classList.remove('active'); clearInterval(timerInterval); return; }
+  initAudio(); sorting = true;
+  $('startBtn').textContent = 'Stop'; $('startBtn').classList.add('active');
+  resetStats(); startTime = performance.now();
+  timerInterval = setInterval(() => { $('elapsed').textContent = ((performance.now() - startTime) / 1000).toFixed(1) + 's'; }, 100);
+  states.fill('default');
+  try { await algorithms[$('algo').value](); await completionSweep(); } catch(e) {}
+  sorting = false; $('startBtn').textContent = 'Start'; $('startBtn').classList.remove('active');
+  clearInterval(timerInterval);
+  $('elapsed').textContent = ((performance.now() - startTime) / 1000).toFixed(1) + 's';
+  draw();
+}
+
+function updateAlgoInfo() {
+  const d = ALGO_DATA[$('algo').value];
+  $('algoInfo').innerHTML = `<div class="section-label">Algorithm</div><h3>${d.name}</h3><div class="complexity"><span>Best: <code>${d.best}</code></span><span>Avg: <code>${d.avg}</code></span><span>Worst: <code>${d.worst}</code></span></div><div class="complexity"><span>Space: <code>${d.space}</code></span><span>Stable: <code>${d.stable?'Yes':'No'}</code></span></div><div class="description">${d.desc}</div>`;
+}
+
+function updateSoundInfo() {
+  const m = $('waveform').value, d = ENGINE_DATA[m];
+  $('engineLabel').textContent = d.label; $('engineDesc').textContent = d.desc;
+  if (m === 'sf2') {
+    $('sndCompare').textContent = 'MIDI note, 50ms'; $('sndSwap').textContent = 'MIDI note, 60ms';
+    $('sndSorted').textContent = 'MIDI chirp, 30ms'; $('sndSweep').textContent = 'MIDI scale C2-C7';
+  } else if (m === 'fm') {
+    $('sndCompare').textContent = 'FM 2:1, 50ms'; $('sndSwap').textContent = 'FM decay, 60ms';
+    $('sndSorted').textContent = 'FM chirp, 30ms'; $('sndSweep').textContent = 'FM ascending';
+  } else {
+    $('sndCompare').textContent = m + ', 50ms'; $('sndSwap').textContent = m + ', 60ms';
+    $('sndSorted').textContent = m + ' chirp, 30ms'; $('sndSweep').textContent = m + ' ascending';
+  }
+}
+
+// Mode toggles
+$('orientBtn').addEventListener('click', () => {
+  horizontal = !horizontal;
+  $('orientBtn').classList.toggle('mode-active', horizontal);
+  resize(); draw();
+});
+
+$('cinemaBtn').addEventListener('click', () => {
+  $('app').classList.toggle('cinematic');
+  $('cinemaBtn').classList.toggle('mode-active');
+  setTimeout(() => { resize(); draw(); }, 50);
+});
+
+// SF2 drag/drop
+const sf2Drop = $('sf2Drop'), sf2Input = $('sf2Input');
+sf2Drop.addEventListener('click', () => sf2Input.click());
+sf2Input.addEventListener('change', e => { if (e.target.files[0]) loadSF2(e.target.files[0]); });
+sf2Drop.addEventListener('dragover', e => { e.preventDefault(); sf2Drop.classList.add('dragover'); });
+sf2Drop.addEventListener('dragleave', () => sf2Drop.classList.remove('dragover'));
+sf2Drop.addEventListener('drop', e => { e.preventDefault(); sf2Drop.classList.remove('dragover'); if (e.dataTransfer.files[0]) loadSF2(e.dataTransfer.files[0]); });
+
+// Events
+$('countSlider').addEventListener('input', () => { $('countVal').textContent = $('countSlider').value; if (!sorting) initArr(); });
+$('algo').addEventListener('change', updateAlgoInfo);
+$('waveform').addEventListener('change', updateSoundInfo);
+$('startBtn').addEventListener('click', start);
+$('shuffleBtn').addEventListener('click', shuffleArr);
+$('reverseBtn').addEventListener('click', reverseArr);
+window.addEventListener('resize', () => { resize(); draw(); });
+
+// Init
+resize(); initArr(); updateAlgoInfo(); updateSoundInfo();
+requestAnimationFrame(drawWaveform);
+</script>
+</body>
+</html>

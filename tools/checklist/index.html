@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Final Review Checklist</title>
+
+  <!-- Bootstrap (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { background:#f7f7f7; }
+    .card { border-radius: 12px; }
+    .small-note { font-size: .9rem; color:#666; }
+    .why { display:none; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; font-size:.9rem; white-space:pre-wrap; }
+    .history-item { cursor:pointer; }
+    .history-item:hover { background:#f2f2f2; }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+      <div>
+        <h1 class="h4 mb-1">Final Review Checklist</h1>
+        <div class="small-note">Why fields only appear when you mark an item Fail.</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="btnNew">New</button>
+        <button class="btn btn-outline-primary btn-sm" id="btnSave">Save Snapshot</button>
+        <button class="btn btn-primary btn-sm" id="btnCopy">Copy Final Comment</button>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Review name</label>
+                <input class="form-control form-control-sm" id="reviewName" placeholder="example: pass 3" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Optional tag</label>
+                <input class="form-control form-control-sm" id="reviewTag" placeholder="example: medium game clone" />
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <button class="btn btn-success btn-sm" id="allPass">All Pass</button>
+              <button class="btn btn-warning btn-sm" id="allUnknown">All Unknown</button>
+              <button class="btn btn-danger btn-sm" id="allFail">All Fail</button>
+              <span class="badge text-bg-light border ms-auto" id="progressBadge">0 complete</span>
+              <span class="badge text-bg-light border" id="failBadge">0 failing</span>
+            </div>
+
+            <div class="accordion" id="sections"></div>
+
+            <hr class="my-3">
+
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="small-note">Export preview</div>
+              <button class="btn btn-outline-secondary btn-sm" id="btnRefresh">Refresh</button>
+            </div>
+            <div class="border rounded p-2 bg-light mono" id="preview"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="fw-semibold">History</div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" id="btnCopyJSON">Copy JSON</button>
+                <button class="btn btn-outline-danger btn-sm" id="btnClearHistory">Clear</button>
+              </div>
+            </div>
+            <div class="small-note mb-2">Saved in localStorage. Click a snapshot to load it.</div>
+            <div class="list-group" id="historyList"></div>
+          </div>
+        </div>
+
+        <div class="small-note mt-3">
+          Keyboard: <span class="badge text-bg-light border">Ctrl+S</span> saves a snapshot.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery + Bootstrap JS (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    (function () {
+      const LS_DRAFT = "frc_draft_v1";
+      const LS_HISTORY = "frc_history_v1";
+
+      const SECTIONS = [
+        { name: "rubric.json", items: [
+          ["rubric_no_vague", "Avoid vague terms such as “correctly,” “clearly,” or “should.” Define explicit observable conditions instead."],
+          ["rubric_self_verifiable", "Ensure each criterion is verifiable on its own by an expert reviewing only that criterion. If not, list the dependency using dependent_on."],
+          ["rubric_full_coverage", "Cover every aspect of the prompt. Do not leave any part of the prompt unevaluated."],
+          ["rubric_no_new_symbols", "Do not introduce new file references or new named symbols (functions, classes, modules, variables) that are not in the prompt."],
+          ["rubric_no_missing_refs", "Do not reference existing files or named symbols unless they are included in the prompt and needed to explain the problem."],
+          ["rubric_no_stacked_checks", "Avoid stacked checks (multiple checks in one) unless they describe a single indivisible behavior."],
+          ["rubric_not_too_strict", "Do not make criteria so strict that functionally valid alternative solutions would fail."],
+          ["rubric_no_golden_patch", "Do not include or rely on details from golden.patch."],
+          ["rubric_interface_if_needed", "Include interface.md only if it is necessary and it improves understanding."],
+          ["rubric_no_tests_process", "Do not reference tests or the test generation process."]
+        ]},
+        { name: "prompt_statement.md", items: [
+          ["ps_no_giant_paragraphs", "Avoid giant paragraphs. The prompt statement should be easy to read."],
+          ["ps_no_step_by_step", "Do not include step by step directions."],
+          ["ps_all_tested_by_patch", "Every aspect is tested by test.patch. No untested requirements are included."],
+          ["ps_user_perspective", "Write from the perspective of the person experiencing the issue."],
+          ["ps_no_test_requests", "Do not request test generation or running tests or other commands."]
+        ]},
+        { name: "interface.md", items: [
+          ["if_defines_needed_symbols", "Define all names, functions, and classes needed by test.patch that are first introduced in golden.patch."],
+          ["if_no_interfaces_needed", "If there are no such symbols, write exactly: NO INTERFACES NEEDED."]
+        ]},
+        { name: "problem_statement.md", items: [
+          ["pr_english", "Write in English."],
+          ["pr_more_detailed", "Provide extended details needed to solve the problem. It should be more detailed than prompt_statement.md."],
+          ["pr_impl_details_ok", "Implementation details are allowed."],
+          ["pr_scoped_alignment", "Scope aligns with prompt_statement.md, interface.md, requirements.json, and test.patch."],
+          ["pr_includes_tested_behavior", "Include any behavior that tests cover."],
+          ["pr_excludes_untested_behavior", "Exclude any behavior not mentioned in tests."]
+        ]},
+        { name: "requirements.json", items: [
+          ["rq_bridges_gap", "Include implementation specifics that bridge prompt_statement.md, problem_statement.md, and test.patch."],
+          ["rq_not_replace_interface", "Do not replace interface.md. Use it for symbol definitions."],
+          ["rq_align_all", "Align with prompt files and test.patch."]
+        ]},
+        { name: "Final review comment bullets", items: [
+          ["final_interface_used_in_tests", "All interface items are utilized within test.patch."],
+          ["final_functional_agnostic", "Functional criteria are implementation agnostic and unstacked."],
+          ["final_robustness_agnostic", "Robustness criteria are implementation agnostic and unstacked."],
+          ["final_style_agnostic", "Style criteria are implementation agnostic and unstacked."],
+          ["final_alignment", "Interface, rubric, prompt statement, and problem statement align."],
+          ["final_rubric_covers_prompt", "Rubric verifies all aspects of the prompt and problem."],
+          ["final_tests_cover_all", "test.patch tests all aspects of the prompt and problem."]
+        ]}
+      ];
+
+      function blankState() {
+        const statuses = {};
+        const whys = {};
+        SECTIONS.forEach(s => s.items.forEach(([id]) => { statuses[id] = "unknown"; whys[id] = ""; }));
+        return {
+          reviewName: "",
+          reviewTag: "",
+          statuses,
+          whys,
+          updatedAt: new Date().toISOString()
+        };
+      }
+
+      let state = loadDraft() || blankState();
+
+      function saveDraft() { localStorage.setItem(LS_DRAFT, JSON.stringify(state)); }
+      function loadDraft() {
+        try { return JSON.parse(localStorage.getItem(LS_DRAFT) || "null"); } catch { return null; }
+      }
+
+      function loadHistory() {
+        try { return JSON.parse(localStorage.getItem(LS_HISTORY) || "[]"); } catch { return []; }
+      }
+      function saveHistory(list) { localStorage.setItem(LS_HISTORY, JSON.stringify(list)); }
+
+      function idSafe(s) { return s.replace(/[^a-zA-Z0-9_]/g, "_"); }
+
+      function render() {
+        $("#reviewName").val(state.reviewName || "");
+        $("#reviewTag").val(state.reviewTag || "");
+
+        const $acc = $("#sections").empty();
+
+        SECTIONS.forEach((sec, idx) => {
+          const secId = "sec_" + idx;
+          const headerId = "hdr_" + idx;
+          const collapseId = "col_" + idx;
+
+          const open = idx === 0 ? "show" : "";
+          const btnCollapsed = idx === 0 ? "" : "collapsed";
+          const ariaExpanded = idx === 0 ? "true" : "false";
+
+          const $item = $(`
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="${headerId}">
+                <button class="accordion-button ${btnCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${ariaExpanded}" aria-controls="${collapseId}">
+                  ${sec.name}
+                </button>
+              </h2>
+              <div id="${collapseId}" class="accordion-collapse collapse ${open}" aria-labelledby="${headerId}" data-bs-parent="#sections">
+                <div class="accordion-body py-2"></div>
+              </div>
+            </div>
+          `);
+
+          const $body = $item.find(".accordion-body");
+          sec.items.forEach(([id, text]) => {
+            const sid = idSafe(id);
+            const sVal = state.statuses[id] || "unknown";
+            const whyVal = state.whys[id] || "";
+
+            const $row = $(`
+              <div class="border rounded p-2 mb-2 bg-white">
+                <div class="d-flex flex-wrap gap-2 align-items-start justify-content-between">
+                  <div style="min-width: 260px;">
+                    <div class="fw-semibold" style="font-size:.95rem;">${text}</div>
+                    <div class="small-note">ID: <span class="mono">${id}</span></div>
+                  </div>
+
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="status">
+                      <input type="radio" class="btn-check" name="st_${sid}" id="p_${sid}" autocomplete="off" ${sVal==="pass"?"checked":""}>
+                      <label class="btn btn-outline-success" for="p_${sid}">Pass</label>
+
+                      <input type="radio" class="btn-check" name="st_${sid}" id="u_${sid}" autocomplete="off" ${sVal==="unknown"?"checked":""}>
+                      <label class="btn btn-outline-warning" for="u_${sid}">Unknown</label>
+
+                      <input type="radio" class="btn-check" name="st_${sid}" id="f_${sid}" autocomplete="off" ${sVal==="fail"?"checked":""}>
+                      <label class="btn btn-outline-danger" for="f_${sid}">Fail</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-2 why" id="why_wrap_${sid}">
+                  <label class="form-label mb-1">Why failing (required if Fail)</label>
+                  <textarea class="form-control form-control-sm" rows="2" id="why_${sid}" placeholder="What is wrong or missing, and what needs to change.">${escapeHtml(whyVal)}</textarea>
+                </div>
+              </div>
+            `);
+
+            $body.append($row);
+
+            // initial why visibility
+            toggleWhy(id);
+          });
+
+          $acc.append($item);
+        });
+
+        wireEvents();
+        updateCounts();
+        refreshPreview();
+        renderHistoryUI();
+      }
+
+      function wireEvents() {
+        // Unbind previous handlers by namespacing
+        $(document).off(".frc");
+
+        $("#reviewName").on("input.frc", function () {
+          state.reviewName = $(this).val();
+          saveDraft();
+          refreshPreview();
+        });
+
+        $("#reviewTag").on("input.frc", function () {
+          state.reviewTag = $(this).val();
+          saveDraft();
+          refreshPreview();
+        });
+
+        // radio changes
+        SECTIONS.forEach(sec => sec.items.forEach(([id]) => {
+          const sid = idSafe(id);
+          $("#p_" + sid).on("change.frc", () => setStatus(id, "pass"));
+          $("#u_" + sid).on("change.frc", () => setStatus(id, "unknown"));
+          $("#f_" + sid).on("change.frc", () => setStatus(id, "fail"));
+
+          $("#why_" + sid).on("input.frc", function () {
+            state.whys[id] = $(this).val();
+            saveDraft();
+            refreshPreview();
+          });
+        }));
+
+        $("#allPass").on("click.frc", () => setAll("pass"));
+        $("#allUnknown").on("click.frc", () => setAll("unknown"));
+        $("#allFail").on("click.frc", () => setAll("fail"));
+
+        $("#btnRefresh").on("click.frc", () => refreshPreview());
+
+        $("#btnNew").on("click.frc", () => {
+          state = blankState();
+          saveDraft();
+          render();
+        });
+
+        $("#btnSave").on("click.frc", () => saveSnapshot());
+
+        $("#btnCopy").on("click.frc", async () => {
+          const txt = buildFinalComment(state);
+          await copyText(txt);
+        });
+
+        $("#btnCopyJSON").on("click.frc", async () => {
+          const payload = { exportedAt: new Date().toISOString(), draft: state, history: loadHistory() };
+          await copyText(JSON.stringify(payload, null, 2));
+        });
+
+        $("#btnClearHistory").on("click.frc", () => {
+          localStorage.removeItem(LS_HISTORY);
+          renderHistoryUI();
+        });
+
+        $("#historyList").on("click.frc", ".history-item", function () {
+          const id = $(this).data("id");
+          const hist = loadHistory();
+          const found = hist.find(x => x.id === id);
+          if (!found) return;
+          state = found.state;
+          saveDraft();
+          render();
+        });
+
+        $("#historyList").on("click.frc", ".btn-copy-snap", async function (e) {
+          e.stopPropagation();
+          const id = $(this).closest(".history-item").data("id");
+          const hist = loadHistory();
+          const found = hist.find(x => x.id === id);
+          if (!found) return;
+          await copyText(buildFinalComment(found.state));
+        });
+
+        $("#historyList").on("click.frc", ".btn-del-snap", function (e) {
+          e.stopPropagation();
+          const id = $(this).closest(".history-item").data("id");
+          const hist = loadHistory().filter(x => x.id !== id);
+          saveHistory(hist);
+          renderHistoryUI();
+        });
+
+        // Ctrl+S save snapshot
+        $(window).on("keydown.frc", function (e) {
+          if ((e.ctrlKey || e.metaKey) && (e.key || "").toLowerCase() === "s") {
+            e.preventDefault();
+            saveSnapshot();
+          }
+        });
+      }
+
+      function setStatus(id, status) {
+        state.statuses[id] = status;
+        state.updatedAt = new Date().toISOString();
+        saveDraft();
+        toggleWhy(id);
+        updateCounts();
+        refreshPreview();
+      }
+
+      function toggleWhy(id) {
+        const sid = idSafe(id);
+        const show = (state.statuses[id] === "fail");
+        $("#why_wrap_" + sid).toggle(show);
+      }
+
+      function setAll(status) {
+        SECTIONS.forEach(sec => sec.items.forEach(([id]) => {
+          state.statuses[id] = status;
+        }));
+        state.updatedAt = new Date().toISOString();
+        saveDraft();
+        render(); // simplest way to sync radios and why visibility
+      }
+
+      function updateCounts() {
+        let total = 0, done = 0, failing = 0;
+        SECTIONS.forEach(sec => sec.items.forEach(([id]) => {
+          total++;
+          const s = state.statuses[id] || "unknown";
+          if (s !== "unknown") done++;
+          if (s === "fail") failing++;
+        }));
+        $("#progressBadge").text(done + " of " + total + " complete");
+        $("#failBadge").text(failing + " failing");
+      }
+
+      function buildFinalComment(st) {
+        const failing = [];
+        SECTIONS.forEach(sec => sec.items.forEach(([id, text]) => {
+          if ((st.statuses[id] || "unknown") === "fail") {
+            const why = (st.whys[id] || "").trim();
+            failing.push("- FAIL (" + id + "): " + text + "\n  - Why: " + (why ? why.replace(/\n+/g, "\n    ") : "[missing explanation]"));
+          }
+        }));
+
+        const header = [];
+        const name = (st.reviewName || "").trim();
+        const tag = (st.reviewTag || "").trim();
+        if (name || tag) {
+          header.push("Review:");
+          if (name) header.push("- Name: " + name);
+          if (tag) header.push("- Tag: " + tag);
+          header.push("");
+        }
+
+        const checklist = [
+          "- [ ] all interface items are utilized within test.patch",
+          "- [ ] functional criteria are implementation agnostic and unstacked",
+          "- [ ] robustness criteria are implementation agnostic and unstacked",
+          "- [ ] style criteria are implementation agnostic and unstacked",
+          "- [ ] interface, rubric, prompt statement, and problem statement align",
+          "- [ ] rubric verifies all aspects of the prompt/problem",
+          "- [ ] test.patch tests all aspects of the prompt/problem"
+        ];
+
+        const out = []
+          .concat(header)
+          .concat(["Requested changes:"])
+          .concat(failing.length ? failing : ["- None noted"])
+          .concat(["", "Checklist:"])
+          .concat(checklist)
+          .join("\n");
+
+        return out;
+      }
+
+      function refreshPreview() {
+        $("#preview").text(buildFinalComment(state));
+      }
+
+      function saveSnapshot() {
+        const hist = loadHistory();
+        const snap = {
+          id: randId(),
+          savedAt: new Date().toISOString(),
+          state: JSON.parse(JSON.stringify(state))
+        };
+        hist.unshift(snap);
+        saveHistory(hist.slice(0, 50));
+        renderHistoryUI();
+      }
+
+      function renderHistoryUI() {
+        const hist = loadHistory();
+        const $list = $("#historyList").empty();
+
+        if (!hist.length) {
+          $list.append(`<div class="text-muted small">No snapshots yet.</div>`);
+          return;
+        }
+
+        hist.forEach(h => {
+          const name = (h.state.reviewName || "").trim() || "Untitled";
+          const tag = (h.state.reviewTag || "").trim();
+          const meta = new Date(h.savedAt).toLocaleString() + (tag ? " | " + tag : "");
+
+          const counts = countState(h.state);
+          const badge = counts.failing ? `badge text-bg-danger` : `badge text-bg-success`;
+          const item = $(`
+            <div class="list-group-item history-item" data-id="${h.id}">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="fw-semibold">${escapeHtml(name)}</div>
+                  <div class="small text-muted">${escapeHtml(meta)}</div>
+                  <div class="small text-muted">${counts.done} of ${counts.total} complete</div>
+                </div>
+                <div class="d-flex flex-column gap-2 align-items-end">
+                  <span class="${badge}">${counts.failing} failing</span>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary btn-copy-snap" type="button">Copy</button>
+                    <button class="btn btn-outline-danger btn-del-snap" type="button">Del</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `);
+          $list.append(item);
+        });
+      }
+
+      function countState(st) {
+        let total = 0, done = 0, failing = 0;
+        SECTIONS.forEach(sec => sec.items.forEach(([id]) => {
+          total++;
+          const s = (st.statuses && st.statuses[id]) ? st.statuses[id] : "unknown";
+          if (s !== "unknown") done++;
+          if (s === "fail") failing++;
+        }));
+        return { total, done, failing };
+      }
+
+      async function copyText(txt) {
+        try {
+          await navigator.clipboard.writeText(txt);
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = txt;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+      }
+
+      function randId() {
+        return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      // Initial mount
+      render();
+    })();
+  </script>
+</body>
+</html>
