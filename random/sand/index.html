@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Falling Sand</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+    #toolbar {
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .tool-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.1s;
+      color: #fff;
+    }
+    .tool-btn:hover { filter: brightness(1.3); }
+    .tool-btn.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.4); }
+    #btn-sand    { background: #c8a84b; }
+    #btn-water   { background: #3a7dd4; }
+    #btn-fire    { background: #d44a1a; }
+    #btn-stone   { background: #666; }
+    #btn-plant   { background: #3a8a3a; }
+    #btn-oil     { background: #7a5a2a; }
+    #btn-ice     { background: #8ab8d8; color: #001; }
+    #btn-erase   { background: #333; border-color: #555; }
+    .sep { width: 1px; height: 28px; background: #444; margin: 0 4px; }
+    #size-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #aaa; }
+    #brush-size { width: 80px; accent-color: #aaa; }
+    #btn-clear {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 2px solid #555;
+      background: #1a1a1a;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #btn-clear:hover { background: #2a2a2a; color: #fff; }
+    #canvas-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 0;
+    }
+    canvas {
+      cursor: crosshair;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      display: block;
+      touch-action: none;
+    }
+    #fps {
+      position: fixed;
+      bottom: 6px;
+      right: 10px;
+      font-size: 11px;
+      color: #555;
+    }
+    #hint {
+      position: fixed;
+      bottom: 6px;
+      left: 10px;
+      font-size: 11px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button class="tool-btn active" id="btn-sand"  data-mat="SAND">Sand</button>
+    <button class="tool-btn"        id="btn-water" data-mat="WATER">Water</button>
+    <button class="tool-btn"        id="btn-fire"  data-mat="FIRE">Fire</button>
+    <button class="tool-btn"        id="btn-stone" data-mat="STONE">Stone</button>
+    <button class="tool-btn"        id="btn-plant" data-mat="PLANT">Plant</button>
+    <button class="tool-btn"        id="btn-oil"   data-mat="OIL">Oil</button>
+    <button class="tool-btn"        id="btn-ice"   data-mat="ICE">Ice</button>
+    <button class="tool-btn"        id="btn-erase" data-mat="EMPTY">Erase</button>
+    <div class="sep"></div>
+    <div id="size-wrap">
+      <span>Brush</span>
+      <input type="range" id="brush-size" min="1" max="20" value="4">
+      <span id="size-label">4</span>
+    </div>
+    <div class="sep"></div>
+    <button id="btn-clear">Clear</button>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+  </div>
+  <div id="fps"></div>
+  <div id="hint">click & drag to draw</div>
+
+<script>
+// ── constants ──────────────────────────────────────────────────────────────
+const EMPTY = 0, SAND = 1, WATER = 2, FIRE = 3, STONE = 4,
+      SMOKE = 5, PLANT = 6, OIL = 7, ICE = 8, STEAM = 9, EMBER = 10;
+
+const CELL = 3; // pixels per cell
+
+// Colors: base, slight variation added per-cell for texture
+const COLORS = {
+  [EMPTY]: null,
+  [SAND]:  [200, 168, 75],
+  [WATER]: [58, 125, 212],
+  [FIRE]:  [220, 74, 26],
+  [STONE]: [100, 100, 105],
+  [SMOKE]: [80, 80, 85],
+  [PLANT]: [58, 138, 58],
+  [OIL]:   [122, 90, 42],
+  [ICE]:   [138, 184, 216],
+  [STEAM]: [160, 180, 200],
+  [EMBER]: [255, 140, 30],
+};
+
+// ── setup ──────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H; // grid dimensions
+let grid, updated, colorNoise;
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  const pw = wrap.clientWidth;
+  const ph = wrap.clientHeight;
+  W = Math.floor(pw / CELL);
+  H = Math.floor(ph / CELL);
+  canvas.width  = W * CELL;
+  canvas.height = H * CELL;
+  grid      = new Uint8Array(W * H);
+  updated   = new Uint8Array(W * H);
+  colorNoise = new Int8Array(W * H);
+  for (let i = 0; i < colorNoise.length; i++)
+    colorNoise[i] = (Math.random() * 30 - 15) | 0;
+}
+resize();
+window.addEventListener('resize', () => { resize(); });
+
+const idx = (x, y) => y * W + x;
+const inBounds = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
+const get = (x, y) => inBounds(x, y) ? grid[idx(x, y)] : STONE;
+const set = (x, y, v) => { if (inBounds(x, y)) grid[idx(x, y)] = v; };
+
+// ── drawing ────────────────────────────────────────────────────────────────
+let currentMat = SAND;
+let brushRadius = 4;
+let isDrawing = false;
+let lastX = -1, lastY = -1;
+
+document.querySelectorAll('.tool-btn[data-mat]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMat = eval(btn.dataset.mat); // safe: known constant names
+  });
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  grid.fill(0);
+});
+
+const brushSlider = document.getElementById('brush-size');
+const sizeLabel = document.getElementById('size-label');
+brushSlider.addEventListener('input', () => {
+  brushRadius = parseInt(brushSlider.value);
+  sizeLabel.textContent = brushRadius;
+});
+
+function cellCoords(e) {
+  const r = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return [
+    Math.floor((clientX - r.left) / CELL),
+    Math.floor((clientY - r.top)  / CELL),
+  ];
+}
+
+function paint(cx, cy) {
+  const r = brushRadius;
+  for (let dy = -r; dy <= r; dy++)
+    for (let dx = -r; dx <= r; dx++)
+      if (dx*dx + dy*dy <= r*r)
+        if (inBounds(cx+dx, cy+dy)) {
+          const cur = get(cx+dx, cy+dy);
+          if (currentMat === EMPTY || cur === EMPTY || cur === FIRE || cur === SMOKE || cur === STEAM || cur === EMBER)
+            set(cx+dx, cy+dy, currentMat);
+        }
+}
+
+function paintLine(x0, y0, x1, y1) {
+  const dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  while (true) {
+    paint(x0, y0);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 <  dx) { err += dx; y0 += sy; }
+  }
+}
+
+canvas.addEventListener('pointerdown', e => {
+  isDrawing = true;
+  canvas.setPointerCapture(e.pointerId);
+  const [cx, cy] = cellCoords(e);
+  paint(cx, cy);
+  lastX = cx; lastY = cy;
+});
+canvas.addEventListener('pointermove', e => {
+  if (!isDrawing) return;
+  const [cx, cy] = cellCoords(e);
+  paintLine(lastX, lastY, cx, cy);
+  lastX = cx; lastY = cy;
+});
+canvas.addEventListener('pointerup',   () => { isDrawing = false; });
+canvas.addEventListener('pointerout',  () => { isDrawing = false; });
+
+// ── simulation ─────────────────────────────────────────────────────────────
+let tick = 0;
+
+function step() {
+  updated.fill(0);
+  tick++;
+
+  // iterate bottom-up, alternating left/right for even distribution
+  const leftRight = tick % 2 === 0;
+
+  for (let y = H - 1; y >= 0; y--) {
+    const xStart = leftRight ? 0 : W - 1;
+    const xEnd   = leftRight ? W : -1;
+    const xStep  = leftRight ? 1 : -1;
+
+    for (let x = xStart; x !== xEnd; x += xStep) {
+      const i = idx(x, y);
+      if (updated[i]) continue;
+      const mat = grid[i];
+      if (mat === EMPTY) continue;
+
+      if      (mat === SAND)  stepSand(x, y, i);
+      else if (mat === WATER) stepWater(x, y, i);
+      else if (mat === FIRE)  stepFire(x, y, i);
+      else if (mat === SMOKE) stepSmoke(x, y, i);
+      else if (mat === STEAM) stepSteam(x, y, i);
+      else if (mat === OIL)   stepOil(x, y, i);
+      else if (mat === ICE)   stepIce(x, y, i);
+      else if (mat === EMBER) stepEmber(x, y, i);
+    }
+  }
+}
+
+function move(x, y, nx, ny) {
+  const i = idx(x, y), ni = idx(nx, ny);
+  grid[ni] = grid[i];
+  grid[i]  = EMPTY;
+  updated[ni] = 1;
+  // swap noise so color follows material
+  const tmp = colorNoise[i];
+  colorNoise[i] = colorNoise[ni];
+  colorNoise[ni] = tmp;
+}
+
+function swap(x, y, nx, ny) {
+  const i = idx(x, y), ni = idx(nx, ny);
+  const tmp = grid[i]; grid[i] = grid[ni]; grid[ni] = tmp;
+  const tn  = colorNoise[i]; colorNoise[i] = colorNoise[ni]; colorNoise[ni] = tn;
+  updated[ni] = 1;
+}
+
+function stepSand(x, y, i) {
+  // fall straight down
+  if (get(x, y+1) === EMPTY || get(x, y+1) === WATER || get(x, y+1) === FIRE || get(x, y+1) === SMOKE) {
+    const below = get(x, y+1);
+    if (below === WATER) swap(x, y, x, y+1);
+    else move(x, y, x, y+1);
+    return;
+  }
+  // fall diagonally
+  const dl = get(x-1, y+1), dr = get(x+1, y+1);
+  const canL = dl === EMPTY || dl === WATER;
+  const canR = dr === EMPTY || dr === WATER;
+  if (canL && canR) {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (get(x+dir, y+1) === WATER) swap(x, y, x+dir, y+1);
+    else move(x, y, x+dir, y+1);
+  } else if (canL) {
+    if (dl === WATER) swap(x, y, x-1, y+1);
+    else move(x, y, x-1, y+1);
+  } else if (canR) {
+    if (dr === WATER) swap(x, y, x+1, y+1);
+    else move(x, y, x+1, y+1);
+  }
+}
+
+function stepWater(x, y, i) {
+  // fall down
+  const below = get(x, y+1);
+  if (below === EMPTY) { move(x, y, x, y+1); return; }
+  // spread sideways
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const sl = get(x - dir, y), sr = get(x + dir, y);
+  if (sr === EMPTY) { move(x, y, x + dir, y); return; }
+  if (sl === EMPTY) { move(x, y, x - dir, y); return; }
+}
+
+function stepFire(x, y, i) {
+  // fire rises and spreads
+  // chance to extinguish
+  if (Math.random() < 0.015) { grid[i] = SMOKE; updated[i] = 1; return; }
+
+  // spread to flammable neighbors
+  const neighbors = [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1]];
+  for (const [dx, dy] of neighbors) {
+    const n = get(x+dx, y+dy);
+    if ((n === PLANT || n === OIL) && Math.random() < 0.06) {
+      set(x+dx, y+dy, FIRE);
+    }
+    if (n === WATER && Math.random() < 0.1) {
+      grid[i] = STEAM; updated[i] = 1; return;
+    }
+    if (n === ICE && Math.random() < 0.05) {
+      set(x+dx, y+dy, WATER);
+    }
+  }
+
+  // rise up
+  if (get(x, y-1) === EMPTY && Math.random() < 0.4) {
+    move(x, y, x, y-1);
+  } else if (Math.random() < 0.3) {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    if (get(x+dir, y) === EMPTY) move(x, y, x+dir, y);
+  }
+}
+
+function stepSmoke(x, y, i) {
+  if (Math.random() < 0.005) { grid[i] = EMPTY; updated[i] = 1; return; }
+  // drift up
+  const up = get(x, y-1);
+  if (up === EMPTY) { move(x, y, x, y-1); return; }
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  if (get(x+dir, y-1) === EMPTY) { move(x, y, x+dir, y-1); return; }
+  if (get(x+dir, y)   === EMPTY) { move(x, y, x+dir, y);   return; }
+}
+
+function stepSteam(x, y, i) {
+  if (Math.random() < 0.003) { grid[i] = EMPTY; updated[i] = 1; return; }
+  const up = get(x, y-1);
+  if (up === EMPTY) { move(x, y, x, y-1); return; }
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  if (get(x+dir, y-1) === EMPTY) move(x, y, x+dir, y-1);
+  else if (get(x+dir, y) === EMPTY) move(x, y, x+dir, y);
+}
+
+function stepOil(x, y, i) {
+  // behaves like water but floats above it
+  const below = get(x, y+1);
+  if (below === EMPTY) { move(x, y, x, y+1); return; }
+  // float on water
+  if (below === WATER) { swap(x, y, x, y+1); return; }
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  const sr = get(x + dir, y), sl = get(x - dir, y);
+  if (sr === EMPTY) { move(x, y, x + dir, y); return; }
+  if (sl === EMPTY) { move(x, y, x - dir, y); return; }
+}
+
+function stepIce(x, y, i) {
+  // slowly melt near fire
+  const neighbors = [[0,-1],[0,1],[-1,0],[1,0]];
+  for (const [dx, dy] of neighbors) {
+    if (get(x+dx, y+dy) === FIRE && Math.random() < 0.03) {
+      grid[i] = WATER; updated[i] = 1; return;
+    }
+  }
+}
+
+function stepEmber(x, y, i) {
+  if (Math.random() < 0.05) { grid[i] = SMOKE; updated[i] = 1; return; }
+  const neighbors = [[0,-1],[0,1],[-1,0],[1,0]];
+  for (const [dx, dy] of neighbors) {
+    const n = get(x+dx, y+dy);
+    if ((n === PLANT || n === OIL) && Math.random() < 0.02) {
+      set(x+dx, y+dy, FIRE);
+    }
+  }
+}
+
+// ── rendering ──────────────────────────────────────────────────────────────
+const imageData = new ImageData(1, 1); // scratch
+
+function render() {
+  const img = ctx.createImageData(W * CELL, H * CELL);
+  const d = img.data;
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const mat = grid[idx(x, y)];
+      if (mat === EMPTY) continue;
+      const base = COLORS[mat];
+      if (!base) continue;
+      const n = colorNoise[idx(x, y)];
+
+      // fire flicker
+      let r = base[0] + n, g = base[1] + n, b = base[2] + n;
+      if (mat === FIRE) {
+        const flicker = (Math.random() * 60 - 30) | 0;
+        r = Math.min(255, base[0] + flicker);
+        g = Math.max(0, base[1] + flicker - 20);
+        b = Math.max(0, base[2] - 10);
+      } else if (mat === SMOKE || mat === STEAM) {
+        const f = (Math.random() * 20 - 10) | 0;
+        r = clamp(r + f); g = clamp(g + f); b = clamp(b + f);
+      }
+
+      // fill CELL×CELL block
+      for (let py = 0; py < CELL; py++) {
+        for (let px = 0; px < CELL; px++) {
+          const pi = ((y * CELL + py) * W * CELL + (x * CELL + px)) * 4;
+          d[pi]   = clamp(r);
+          d[pi+1] = clamp(g);
+          d[pi+2] = clamp(b);
+          d[pi+3] = 255;
+        }
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+// ── loop ───────────────────────────────────────────────────────────────────
+let lastTime = 0, frameCount = 0, fpsTimer = 0;
+const fpsEl = document.getElementById('fps');
+
+function loop(ts) {
+  const dt = ts - lastTime;
+  lastTime = ts;
+
+  step();
+  render();
+
+  frameCount++;
+  fpsTimer += dt;
+  if (fpsTimer > 500) {
+    fpsEl.textContent = `${Math.round(frameCount / fpsTimer * 1000)} fps`;
+    frameCount = 0; fpsTimer = 0;
+  }
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
