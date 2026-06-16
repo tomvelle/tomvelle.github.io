@@ -79,9 +79,18 @@
 
   .sysline {
     margin-left: auto; font-size: 10.5px; color: var(--ink-faint);
-    letter-spacing: .5px; display: flex; gap: 16px;
+    letter-spacing: .5px; display: flex; gap: 16px; align-items: center;
   }
   .sysline b { color: var(--ink-dim); font-weight: 500; }
+
+  .hdr-actions { display: flex; gap: 8px; margin-left: 22px; }
+  .hdr-btn {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    background: none; border: 1px solid var(--line); color: var(--ink-dim);
+    padding: 6px 11px; cursor: pointer; transition: color .15s, border-color .15s;
+  }
+  .hdr-btn:hover { color: var(--sig); border-color: var(--sig-dim); }
+  .hdr-btn.warn:hover { color: var(--warn); border-color: var(--warn); }
 
   /* ---------- tabs ---------- */
   .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
@@ -333,9 +342,13 @@
     </div>
     <div class="sysline">
       <span>NODE <b>tv-prime</b></span>
-      <span>CYCLE <b id="cycleTag">2025→2026</b></span>
-      <span>STATUS <b style="color:var(--sig)">HARVESTING</b></span>
+      <span id="saveState" style="color:var(--ink-dim)">AUTOSAVE</span>
     </div>
+    <div class="hdr-actions">
+      <button class="hdr-btn" id="exportBtn" title="Save registry to a .json file">↓ Export</button>
+      <button class="hdr-btn" id="importBtn" title="Load a registry .json file">↑ Import</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
   </header>
 
   <nav class="tabs">
@@ -654,7 +667,7 @@ $("#copyBtn").addEventListener("click", () => {
 $("#commitBtn").addEventListener("click", () => {
   if (!pendingMarker) return;
   MARKERS.push(pendingMarker);
-  renderCatalog(); populateGraph();
+  renderCatalog(); populateGraph(); saveLocal();
   toast("committed to registry");
   $("#genOut").classList.remove("show");
   // jump to catalog
@@ -718,14 +731,14 @@ function openDrawer(id) {
 
   // wire interactions
   $("#postEdit").addEventListener("change", e => {
-    m.post = e.target.value.trim(); renderCatalog();
+    m.post = e.target.value.trim(); renderCatalog(); saveLocal();
   });
   $$("#drawerBody .opt[data-toggle]").forEach(opt => {
     opt.addEventListener("click", () => {
       const tid = opt.dataset.toggle;
       const i = m.feeds.indexOf(tid);
       if (i>=0) m.feeds.splice(i,1); else m.feeds.push(tid);
-      openDrawer(id); renderCatalog(); populateGraph();
+      openDrawer(id); renderCatalog(); populateGraph(); saveLocal();
     });
   });
   $$("#drawerBody .d-link-item[data-goto]").forEach(it => {
@@ -734,7 +747,7 @@ function openDrawer(id) {
   $("#delBtn").addEventListener("click", () => {
     MARKERS = MARKERS.filter(x=>x.id!==id);
     MARKERS.forEach(x => x.feeds = x.feeds.filter(f=>f!==id));
-    closeDrawer(); renderCatalog(); populateGraph(); toast("instance deleted");
+    closeDrawer(); renderCatalog(); populateGraph(); saveLocal(); toast("instance deleted");
   });
 
   $("#scrim").classList.add("open");
@@ -906,10 +919,134 @@ window.addEventListener("resize", () => {
   rzTmr = setTimeout(()=>{ if($("#graphView").classList.contains("active")){ populateGraph(); runAnim(); } }, 200);
 });
 
+// ============================================================
+//   AUTOSAVE  (localStorage — works when run as a local file)
+// ============================================================
+const LS_KEY = "tommyverse-sync-registry-v1";
+let lsAvailable = (() => {
+  try { const k="__t"; localStorage.setItem(k,"1"); localStorage.removeItem(k); return true; }
+  catch(e){ return false; }
+})();
+
+function saveLocal() {
+  if (!lsAvailable) return;
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      version: 1, savedAt: new Date().toISOString(),
+      seeds: SEEDS, markers: MARKERS, idCounter
+    }));
+    flashSaved();
+  } catch(e){ /* quota or blocked — silently skip */ }
+}
+
+function loadLocal() {
+  if (!lsAvailable) return false;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.markers)) return false;
+    if (data.seeds) Object.entries(data.seeds).forEach(([k,v])=>{ if(!SEEDS[k]) SEEDS[k]=v; });
+    MARKERS = data.markers.map(m => ({
+      id:m.id||newId(), seed:m.seed||"TV", verb:m.verb||"RD", obj:m.obj||"ME",
+      year:parseInt(m.year)||2025, sfx:m.sfx||"S-O", phrase:m.phrase||"",
+      post:m.post||"", caption:m.caption||"", feeds:Array.isArray(m.feeds)?m.feeds:[]
+    }));
+    if (typeof data.idCounter==="number") idCounter = Math.max(idCounter, data.idCounter);
+    return true;
+  } catch(e){ return false; }
+}
+
+// tiny "saved" indicator in the header
+function flashSaved() {
+  const el = $("#saveState"); if (!el) return;
+  el.textContent = "SAVED";
+  el.style.color = "var(--ok)";
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.textContent = lsAvailable ? "AUTOSAVE ON" : "SESSION ONLY"; el.style.color = lsAvailable ? "var(--ink-dim)" : "var(--warn)"; }, 1100);
+}
+
+// ============================================================
+//   EXPORT / IMPORT  (persistence via downloadable JSON)
+// ============================================================
+function exportRegistry() {
+  const payload = {
+    format: "tommyverse-sync-registry",
+    version: 1,
+    exported: new Date().toISOString(),
+    seeds: SEEDS,
+    markers: MARKERS,
+    idCounter: idCounter
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `tommyverse-registry-${stamp}.json`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  toast(`exported ${MARKERS.length} markers`);
+}
+
+function importRegistry(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.format !== "tommyverse-sync-registry" || !Array.isArray(data.markers)) {
+        toast("not a valid registry file"); return;
+      }
+      // merge custom seeds (keep built-ins, add any new ones)
+      if (data.seeds && typeof data.seeds === "object") {
+        Object.entries(data.seeds).forEach(([k,v]) => { if (!SEEDS[k]) SEEDS[k] = v; });
+      }
+      MARKERS = data.markers.map(m => ({
+        id: m.id || newId(),
+        seed: m.seed || "TV",
+        verb: m.verb || "RD",
+        obj: m.obj || "ME",
+        year: parseInt(m.year) || 2025,
+        sfx: m.sfx || "S-O",
+        phrase: m.phrase || "",
+        post: m.post || "",
+        caption: m.caption || "",
+        feeds: Array.isArray(m.feeds) ? m.feeds : []
+      }));
+      if (typeof data.idCounter === "number") idCounter = Math.max(idCounter, data.idCounter);
+      populateSeedSelectors();
+      renderCatalog();
+      populateGraph();
+      closeDrawer();
+      saveLocal();
+      toast(`imported ${MARKERS.length} markers`);
+      $$(".tab")[0].click();
+    } catch (err) {
+      toast("could not read file — bad JSON");
+    }
+  };
+  reader.readAsText(file);
+}
+
+$("#exportBtn").addEventListener("click", exportRegistry);
+$("#importBtn").addEventListener("click", () => $("#importFile").click());
+$("#importFile").addEventListener("change", e => {
+  if (e.target.files && e.target.files[0]) importRegistry(e.target.files[0]);
+  e.target.value = ""; // allow re-importing same file
+});
+
 // ---- boot -------------------------------------------------------------
+loadLocal();   // restore saved registry if present; otherwise keep seed data
 populateSeedSelectors();
 renderCatalog();
 populateGraph();
+// reflect autosave status in header
+(function(){
+  const el = $("#saveState");
+  if (el) { el.textContent = lsAvailable ? "AUTOSAVE ON" : "SESSION ONLY";
+            el.style.color = lsAvailable ? "var(--ink-dim)" : "var(--warn)"; }
+})();
 // gentle settle when graph first opened
 $$(".tab")[1].addEventListener("click", () => { populateGraph(); runAnim(); }, {once:false});
 </script>
