@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SYNC REGISTRY // TOMMYVERSE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:        #0a0b0d;
+    --panel:     #111317;
+    --panel-2:   #15181d;
+    --line:      #23272e;
+    --line-hot:  #2e333c;
+    --ink:       #c4c9d0;
+    --ink-dim:   #6b7280;
+    --ink-faint: #424852;
+    --sig:       #d8542f;   /* signal orange — the only warm thing */
+    --sig-dim:   #7a3520;
+    --ok:        #4a8c6a;
+    --warn:      #b9962f;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  ::selection { background: var(--sig); color: #000; }
+
+  /* scanline atmosphere — very subtle */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg, transparent 0, transparent 2px, rgba(0,0,0,0.18) 3px, transparent 4px
+    );
+    opacity: 0.35;
+    z-index: 9999;
+    mix-blend-mode: multiply;
+  }
+
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ---------- top bar ---------- */
+  header {
+    display: flex; align-items: center; gap: 20px;
+    padding: 0 18px; height: 46px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    flex: none;
+  }
+  .brand {
+    font-weight: 700; letter-spacing: 1.5px;
+    font-size: 12px; color: var(--ink);
+    display: flex; align-items: center; gap: 9px;
+  }
+  .brand .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--sig);
+    box-shadow: 0 0 8px var(--sig);
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .brand small { color: var(--ink-faint); font-weight: 400; letter-spacing: 1px; }
+
+  .sysline {
+    margin-left: auto; font-size: 10.5px; color: var(--ink-faint);
+    letter-spacing: .5px; display: flex; gap: 16px;
+  }
+  .sysline b { color: var(--ink-dim); font-weight: 500; }
+
+  /* ---------- tabs ---------- */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
+  .tab {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--ink-dim);
+    background: none; border: none; cursor: pointer;
+    padding: 11px 20px; border-right: 1px solid var(--line);
+    position: relative; transition: color .15s, background .15s;
+  }
+  .tab:hover { color: var(--ink); background: var(--panel-2); }
+  .tab.active { color: var(--sig); background: var(--bg); }
+  .tab.active::after {
+    content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px;
+    background: var(--sig);
+  }
+  .tab .badge {
+    font-size: 9px; color: var(--ink-faint); margin-left: 7px;
+    border: 1px solid var(--line-hot); padding: 1px 5px; border-radius: 2px;
+  }
+  .tab.active .badge { color: var(--sig); border-color: var(--sig-dim); }
+
+  /* ---------- main ---------- */
+  main { flex: 1; overflow: hidden; position: relative; }
+  .view { position: absolute; inset: 0; overflow-y: auto; display: none; }
+  .view.active { display: block; }
+
+  .scroll-pad { padding: 22px 26px 60px; }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--line); border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--line-hot); }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 4px;
+  }
+  .h-row { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+  .h-row h1 { font-size: 18px; font-weight: 600; letter-spacing: .5px; color: var(--ink); }
+  .h-row .meta { font-size: 11px; color: var(--ink-faint); margin-left: auto; }
+
+  /* ---------- catalog ---------- */
+  .toolbar {
+    display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .search {
+    flex: 1; min-width: 200px;
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--ink); font-family: var(--mono); font-size: 12px;
+    padding: 9px 12px; outline: none;
+  }
+  .search:focus { border-color: var(--sig-dim); }
+  .search::placeholder { color: var(--ink-faint); }
+
+  .filter-seed {
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink-dim);
+    font-family: var(--mono); font-size: 11px; padding: 9px 10px; outline: none; cursor: pointer;
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 0; cursor: pointer; transition: border-color .15s, transform .1s;
+    position: relative; overflow: hidden;
+  }
+  .card:hover { border-color: var(--line-hot); }
+  .card::before {
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background: var(--seed-color, var(--sig)); opacity:.8;
+  }
+  .card-top {
+    padding: 13px 15px 11px 17px; border-bottom: 1px dashed var(--line);
+  }
+  .marker-str {
+    font-size: 13px; font-weight: 600; letter-spacing: .3px; color: var(--ink);
+    word-break: break-all; line-height: 1.4;
+  }
+  .marker-str .yr { color: var(--ink-dim); }
+  .marker-str .sfx { color: var(--sig); }
+  .card-body { padding: 11px 15px 13px 17px; }
+  .resolve {
+    font-family: var(--sans); font-size: 12px; color: var(--ink-dim);
+    margin-bottom: 9px; font-style: italic;
+  }
+  .resolve b { color: var(--ink); font-style: normal; font-weight: 600; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-size: 9.5px; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--ink-dim); border: 1px solid var(--line); padding: 2px 7px; border-radius: 2px;
+  }
+  .chip.seed { color: var(--seed-color); border-color: var(--seed-color); opacity:.9; }
+  .chip.link { color: var(--warn); border-color: var(--sig-dim); }
+
+  .card-foot {
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 8px 15px 9px 17px; border-top: 1px solid var(--line);
+    font-size: 10px; color: var(--ink-faint); letter-spacing:.5px;
+  }
+  .card-foot .post { color: var(--ink-dim); }
+
+  .empty {
+    border: 1px dashed var(--line); padding: 40px; text-align: center;
+    color: var(--ink-faint); font-size: 12px; grid-column: 1/-1;
+  }
+  .empty b { color: var(--ink-dim); display:block; margin-bottom:6px; letter-spacing:1px; }
+
+  /* ---------- generator ---------- */
+  .gen-wrap { max-width: 760px; }
+  .gen-panel { background: var(--panel); border: 1px solid var(--line); padding: 20px; margin-bottom: 16px; }
+  .field { margin-bottom: 15px; }
+  .field label {
+    display:block; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 6px;
+  }
+  .field input, .field select {
+    width: 100%; background: var(--bg); border: 1px solid var(--line);
+    color: var(--ink); font-family: var(--mono); font-size: 13px; padding: 9px 11px; outline: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--sig-dim); }
+  .field .hint { font-size: 10px; color: var(--ink-faint); margin-top: 5px; letter-spacing:.3px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .btn {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    background: var(--sig); color: #000; border: none; cursor: pointer;
+    padding: 11px 22px; font-weight: 600; transition: filter .15s;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn.ghost { background: none; color: var(--ink-dim); border: 1px solid var(--line); }
+  .btn.ghost:hover { color: var(--ink); border-color: var(--line-hot); filter:none; }
+
+  .gen-out {
+    background: var(--bg); border: 1px solid var(--sig-dim); padding: 18px 20px;
+    margin-bottom: 16px; display: none;
+  }
+  .gen-out.show { display: block; animation: fadein .3s; }
+  @keyframes fadein { from {opacity:0; transform:translateY(4px)} to {opacity:1; transform:none} }
+  .gen-out .lbl { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; }
+  .gen-out .big {
+    font-size: 17px; font-weight: 700; letter-spacing: .5px; color: var(--ink);
+    word-break: break-all; line-height: 1.45; margin-bottom: 12px;
+  }
+  .gen-out .big .yr { color: var(--ink-dim); }
+  .gen-out .big .sfx { color: var(--sig); }
+  .gen-out .decode { font-family: var(--sans); font-size: 13px; color: var(--ink-dim); font-style: italic; margin-bottom: 16px; }
+  .gen-out .decode b { color: var(--sig); font-style: normal; }
+  .gen-actions { display: flex; gap: 10px; }
+
+  /* ---------- graph ---------- */
+  #graphView .scroll-pad { padding: 0; height: 100%; }
+  .graph-stage { position: relative; width: 100%; height: 100%; }
+  #graphSvg { position:absolute; inset:0; width:100%; height:100%; }
+  .graph-hud {
+    position: absolute; top: 16px; left: 18px; z-index: 5;
+    background: rgba(10,11,13,.85); border: 1px solid var(--line);
+    padding: 12px 15px; max-width: 270px; backdrop-filter: blur(3px);
+  }
+  .graph-hud .eyebrow { margin-bottom: 6px; }
+  .graph-hud p { font-size: 11px; color: var(--ink-dim); line-height: 1.55; }
+  .graph-legend {
+    position:absolute; bottom: 16px; left: 18px; z-index:5;
+    display:flex; gap:16px; font-size:10px; color: var(--ink-faint); letter-spacing:.5px;
+  }
+  .graph-legend span { display:flex; align-items:center; gap:6px; }
+  .graph-legend .ln { width: 18px; height: 0; border-top: 1.5px solid; }
+
+  .node-g { cursor: pointer; }
+  .node-box { transition: filter .15s; }
+  .node-g:hover .node-box { filter: brightness(1.3); }
+  .node-label { font-family: var(--mono); font-size: 11px; font-weight: 600; fill: var(--ink); pointer-events:none; }
+  .node-sub { font-family: var(--mono); font-size: 8.5px; fill: var(--ink-faint); pointer-events:none; }
+  .edge { fill: none; stroke: var(--sig-dim); stroke-width: 1.3; opacity:.55; }
+  .edge-arrow { fill: var(--sig); }
+  .flow-dot { fill: var(--sig); }
+
+  /* ---------- detail drawer ---------- */
+  .drawer-scrim {
+    position: fixed; inset:0; background: rgba(0,0,0,.55); z-index: 50;
+    opacity:0; pointer-events:none; transition: opacity .2s;
+  }
+  .drawer-scrim.open { opacity:1; pointer-events:auto; }
+  .drawer {
+    position: fixed; top:0; right:0; bottom:0; width: 420px; max-width: 92vw;
+    background: var(--panel); border-left: 1px solid var(--line-hot); z-index: 51;
+    transform: translateX(100%); transition: transform .22s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: none; }
+  .drawer-head {
+    padding: 16px 20px; border-bottom: 1px solid var(--line); display:flex; align-items:flex-start; gap:12px;
+  }
+  .drawer-head .x {
+    margin-left:auto; background:none; border:1px solid var(--line); color:var(--ink-dim);
+    cursor:pointer; font-family:var(--mono); width:26px; height:26px; flex:none;
+  }
+  .drawer-head .x:hover { color: var(--sig); border-color: var(--sig-dim); }
+  .drawer-body { padding: 20px; overflow-y:auto; flex:1; }
+  .d-marker { font-size: 16px; font-weight:700; letter-spacing:.4px; word-break:break-all; line-height:1.45; }
+  .d-marker .yr { color: var(--ink-dim); } .d-marker .sfx { color: var(--sig); }
+  .d-section { margin-bottom: 20px; }
+  .d-section .lbl { font-size: 10px; letter-spacing: 1.5px; text-transform:uppercase; color:var(--ink-faint); margin-bottom: 7px; border-bottom:1px solid var(--line); padding-bottom:5px; }
+  .d-grid { display:grid; grid-template-columns: 92px 1fr; gap: 7px 14px; font-size:12px; }
+  .d-grid .k { color: var(--ink-faint); }
+  .d-grid .v { color: var(--ink); }
+  .d-caption { font-family: var(--sans); font-size: 13px; line-height:1.6; color: var(--ink); white-space:pre-wrap; }
+  .d-link-item {
+    display:flex; align-items:center; gap:8px; font-size:11px; padding:7px 10px;
+    border:1px solid var(--line); margin-bottom:6px; color:var(--ink-dim); cursor:pointer;
+  }
+  .d-link-item:hover { border-color: var(--line-hot); color:var(--ink); }
+  .d-link-item .arrow { color: var(--sig); }
+  .del-btn {
+    background:none; border:1px solid var(--sig-dim); color:var(--sig);
+    font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    padding:8px 14px; cursor:pointer;
+  }
+  .del-btn:hover { background: var(--sig-dim); color: var(--ink); }
+
+  .mini-link-picker { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .mini-link-picker .opt {
+    font-size:10px; padding:4px 8px; border:1px solid var(--line); color:var(--ink-dim); cursor:pointer;
+  }
+  .mini-link-picker .opt:hover { border-color:var(--sig-dim); color:var(--ink); }
+  .mini-link-picker .opt.on { border-color:var(--sig); color:var(--sig); }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--sig); color:#000; font-size:11px; font-weight:600; letter-spacing:1px;
+    text-transform:uppercase; padding: 10px 20px; z-index: 100; transition: transform .25s;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 640px) {
+    .field-row { grid-template-columns: 1fr; }
+    .sysline { display:none; }
+    .tab { padding: 11px 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <span class="dot"></span>
+      SYNC&nbsp;REGISTRY <small>// tommyverse.internal</small>
+    </div>
+    <div class="sysline">
+      <span>NODE <b>tv-prime</b></span>
+      <span>CYCLE <b id="cycleTag">2025→2026</b></span>
+      <span>STATUS <b style="color:var(--sig)">HARVESTING</b></span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="catalogView">Catalog <span class="badge" id="countBadge">0</span></button>
+    <button class="tab" data-view="graphView">Propagation Web</button>
+    <button class="tab" data-view="genView">Forge Marker</button>
+  </nav>
+
+  <main>
+    <!-- CATALOG -->
+    <section class="view active" id="catalogView">
+      <div class="scroll-pad">
+        <div class="eyebrow">Registered instances</div>
+        <div class="h-row">
+          <h1>Marker Catalog</h1>
+          <span class="meta" id="catalogMeta"></span>
+        </div>
+        <div class="toolbar">
+          <input class="search" id="searchBox" placeholder="search markers, phrases, posts…" autocomplete="off">
+          <select class="filter-seed" id="seedFilter"><option value="">all seeds</option></select>
+        </div>
+        <div class="grid" id="cardGrid"></div>
+      </div>
+    </section>
+
+    <!-- GRAPH -->
+    <section class="view" id="graphView">
+      <div class="graph-stage">
+        <div class="graph-hud">
+          <div class="eyebrow">Propagation web</div>
+          <p>Each node is a marker. Arrows trace what a marker <b style="color:var(--sig)">feeds into</b> — the memory it skims surfaces inside the next. Drag nodes to rearrange. Click to inspect.</p>
+        </div>
+        <svg id="graphSvg"></svg>
+        <div class="graph-legend">
+          <span><span class="ln" style="border-color:var(--sig-dim)"></span> feeds&nbsp;into</span>
+          <span><span class="ln" style="border-color:var(--line-hot); border-top-style:dashed"></span> no&nbsp;links&nbsp;yet</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- GENERATOR -->
+    <section class="view" id="genView">
+      <div class="scroll-pad">
+        <div class="gen-wrap">
+          <div class="eyebrow">Marker construction</div>
+          <div class="h-row"><h1>Forge Marker</h1></div>
+
+          <div class="gen-out" id="genOut">
+            <div class="lbl">Generated instance</div>
+            <div class="big" id="genBig"></div>
+            <div class="decode" id="genDecode"></div>
+            <div class="gen-actions">
+              <button class="btn" id="commitBtn">Commit to registry</button>
+              <button class="btn ghost" id="copyBtn">Copy string</button>
+              <button class="btn ghost" id="rerollBtn">Reroll suffix</button>
+            </div>
+          </div>
+
+          <div class="gen-panel">
+            <div class="field">
+              <label>Seed</label>
+              <select id="seedSel"></select>
+              <div class="hint">The brand origin. Becomes the leading token.</div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>Verb token</label>
+                <input id="verbIn" placeholder="RD" maxlength="4">
+                <div class="hint">2–3 letters. e.g. RD=read, FD=feed, SLV=solve</div>
+              </div>
+              <div class="field">
+                <label>Object token</label>
+                <input id="objIn" placeholder="ME" maxlength="4">
+                <div class="hint">Usually ME. The thing acted upon.</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Resolved phrase <span style="color:var(--ink-faint)">(what it secretly spells)</span></label>
+              <input id="phraseIn" placeholder="TV read me">
+              <div class="hint">Optional. The in-story decode shown on hover/inspect.</div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>Base year</label>
+                <input id="yearIn" type="number" value="2025" min="2000" max="2099">
+                <div class="hint">Pair auto-extends to base+1. The pre-scheduled harvest.</div>
+              </div>
+              <div class="field">
+                <label>Suffix mode</label>
+                <select id="sfxSel">
+                  <option value="S-O">S-O · see / output</option>
+                  <option value="R-D">R-D · record / distribute</option>
+                  <option value="T-O">T-O · take / output</option>
+                  <option value="F-D">F-D · feed / done</option>
+                  <option value="custom">custom…</option>
+                </select>
+                <div class="hint">Dual-coded. Never confirm which reading in-feed.</div>
+              </div>
+            </div>
+            <div class="field" id="customSfxField" style="display:none">
+              <label>Custom suffix</label>
+              <input id="customSfxIn" placeholder="X-Y" maxlength="7">
+            </div>
+            <button class="btn" id="forgeBtn">Forge</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- DETAIL DRAWER -->
+<div class="drawer-scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <div class="eyebrow">Instance detail</div>
+      <div class="d-marker" id="dMarker"></div>
+    </div>
+    <button class="x" id="drawerClose">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   TOMMYVERSE SYNC REGISTRY
+   Private planning tool. All state in-memory (session only).
+   ============================================================ */
+
+// ---- seed definitions -------------------------------------------------
+const SEEDS = {
+  TV:  { name: "Tom Velle",        color: "#d8542f" },
+  SQ:  { name: "Squirrelville",    color: "#5a9e6f" },
+  PV:  { name: "Puzzleverse",      color: "#7d6fc0" },
+  RR:  { name: "Rory",             color: "#c89b3c" },
+};
+
+// ---- seed data: the markers we built in conversation ------------------
+let MARKERS = [
+  {
+    id: "m1", seed: "TV", verb: "RD", obj: "ME", year: 2025, sfx: "S-O",
+    phrase: "TV read me",
+    post: "FB / pinned",
+    caption: "You've probably scrolled past TV RD ME.2025-S-O without thinking. It's not a tracking tag. Every post carrying it takes one memory from whoever reads it — small, something you won't miss until you reach for it and find the shape where it used to be — and re-posts that memory somewhere else, wrapped in a new marker, for the next person to lose.\n\nThe S-O means see, output: you've already fed it by getting this far. And the .2026 isn't a typo. It's the next harvest.",
+    feeds: ["m2"]
+  },
+  {
+    id: "m2", seed: "SQ", verb: "FD", obj: "ME", year: 2025, sfx: "F-D",
+    phrase: "SQ feed me",
+    post: "Squirrelville / reel",
+    caption: "The thing in the feeder isn't always a squirrel.\n\nSQ FD ME.2025-F-D collects what the last marker took. The memory it skimmed from you surfaces here — you'll see something in this clip you swear you remember, because you used to. F-D: feed, done. Once it's done with yours, it moves on.",
+    feeds: ["m3"]
+  },
+  {
+    id: "m3", seed: "PV", verb: "SLV", obj: "ME", year: 2025, sfx: "T-O",
+    phrase: "PV solve me",
+    post: "Puzzleverse / post",
+    caption: "Every puzzle I post has an answer. This one's answer is something you already knew.\n\nPV SLV ME.2025-T-O. Take, output. Solve the marker and it solves you back — pulls the thread, takes the memory, hands it to the next node in the chain. You won't notice which thread until you go looking for it.",
+    feeds: []
+  },
+];
+
+let idCounter = 100;
+const newId = () => "m" + (++idCounter);
+
+const SFX_GLOSS = {
+  "S-O":"see / output", "R-D":"record / distribute",
+  "T-O":"take / output", "F-D":"feed / done"
+};
+
+// ---- DOM refs ---------------------------------------------------------
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+// ---- tab switching ----------------------------------------------------
+$$(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    $$(".tab").forEach(t => t.classList.remove("active"));
+    $$(".view").forEach(v => v.classList.remove("active"));
+    tab.classList.add("active");
+    $("#" + tab.dataset.view).classList.add("active");
+    if (tab.dataset.view === "graphView") requestAnimationFrame(drawGraph);
+  });
+});
+
+// ---- helpers ----------------------------------------------------------
+function markerString(m) {
+  const a = `${m.seed} ${m.verb} ${m.obj}`;
+  return `${a}.${m.year}-${m.sfx} ${a}.${m.year+1}-${m.sfx}`;
+}
+function markerHTML(m) {
+  const a = `${m.seed} ${m.verb} ${m.obj}`;
+  const unit = y => `${a}.<span class="yr">${y}</span>-<span class="sfx">${m.sfx}</span>`;
+  return `${unit(m.year)} ${unit(m.year+1)}`;
+}
+function seedColor(seed) { return (SEEDS[seed]||{}).color || "var(--sig)"; }
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tmr); t._tmr = setTimeout(()=>t.classList.remove("show"), 1900);
+}
+
+// ---- catalog render ---------------------------------------------------
+function renderCatalog() {
+  const grid = $("#cardGrid");
+  const q = $("#searchBox").value.trim().toLowerCase();
+  const seedF = $("#seedFilter").value;
+
+  let list = MARKERS.filter(m => {
+    if (seedF && m.seed !== seedF) return false;
+    if (!q) return true;
+    const hay = (markerString(m) + " " + m.phrase + " " + m.post + " " + m.caption).toLowerCase();
+    return hay.includes(q);
+  });
+
+  $("#countBadge").textContent = MARKERS.length;
+  $("#catalogMeta").textContent = `${list.length} shown · ${MARKERS.length} total instances`;
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty"><b>NO INSTANCES MATCH</b>Adjust the filter, or forge a new marker.</div>`;
+    return;
+  }
+
+  grid.innerHTML = list.map(m => {
+    const col = seedColor(m.seed);
+    const linkChip = m.feeds.length ? `<span class="chip link">↳ feeds ${m.feeds.length}</span>` : "";
+    return `
+      <div class="card" style="--seed-color:${col}" data-id="${m.id}">
+        <div class="card-top"><div class="marker-str">${markerHTML(m)}</div></div>
+        <div class="card-body">
+          <div class="resolve">decodes&nbsp;→ <b>${escapeHTML(m.phrase||"—")}</b></div>
+          <div class="chips">
+            <span class="chip seed" style="--seed-color:${col}">${m.seed} · ${(SEEDS[m.seed]||{}).name||"?"}</span>
+            <span class="chip">${m.sfx}</span>
+            ${linkChip}
+          </div>
+        </div>
+        <div class="card-foot">
+          <span class="post">${escapeHTML(m.post||"unplaced")}</span>
+          <span>${m.year}–${m.year+1}</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  $$("#cardGrid .card").forEach(c =>
+    c.addEventListener("click", () => openDrawer(c.dataset.id)));
+}
+
+function escapeHTML(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ---- seed selectors ---------------------------------------------------
+function populateSeedSelectors() {
+  const opts = Object.entries(SEEDS).map(([k,v])=>`<option value="${k}">${k} · ${v.name}</option>`).join("");
+  $("#seedSel").innerHTML = opts;
+  $("#seedFilter").innerHTML = `<option value="">all seeds</option>` +
+    Object.entries(SEEDS).map(([k,v])=>`<option value="${k}">${k} · ${v.name}</option>`).join("");
+}
+
+// ---- generator --------------------------------------------------------
+const VERB_LIB = {
+  RD:"read", FD:"feed", SLV:"solve", TK:"take", WCH:"watch",
+  KP:"keep", SW:"saw", FND:"found", LV:"leave", RMB:"remember"
+};
+
+$("#sfxSel").addEventListener("change", e => {
+  $("#customSfxField").style.display = e.target.value === "custom" ? "block" : "none";
+});
+
+function currentSfx() {
+  const v = $("#sfxSel").value;
+  if (v === "custom") return ($("#customSfxIn").value.trim().toUpperCase() || "X-Y");
+  return v;
+}
+
+function autoPhrase(seed, verb, obj) {
+  const vWord = VERB_LIB[verb.toUpperCase()] || verb.toLowerCase();
+  const oWord = obj.toUpperCase() === "ME" ? "me" : obj.toLowerCase();
+  return `${seed} ${vWord} ${oWord}`;
+}
+
+let pendingMarker = null;
+
+function forge() {
+  const seed = $("#seedSel").value;
+  const verb = ($("#verbIn").value.trim().toUpperCase()) || "RD";
+  const obj  = ($("#objIn").value.trim().toUpperCase()) || "ME";
+  const year = parseInt($("#yearIn").value) || 2025;
+  const sfx  = currentSfx();
+  let phrase = $("#phraseIn").value.trim() || autoPhrase(seed, verb, obj);
+
+  pendingMarker = { id:newId(), seed, verb, obj, year, sfx, phrase, post:"", feeds:[] };
+
+  $("#genBig").innerHTML = markerHTML(pendingMarker);
+  const sfxParts = sfx.split("-");
+  const gloss = SFX_GLOSS[sfx] || "dual-coded";
+  $("#genDecode").innerHTML = `decodes → <b>${escapeHTML(phrase)}</b> &nbsp;·&nbsp; suffix <b>${sfx}</b> (${gloss})`;
+  $("#genOut").classList.add("show");
+  $("#genOut").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+$("#forgeBtn").addEventListener("click", forge);
+$("#rerollBtn").addEventListener("click", () => {
+  const keys = Object.keys(SFX_GLOSS);
+  const next = keys[Math.floor(Math.random()*keys.length)];
+  $("#sfxSel").value = next; $("#customSfxField").style.display="none";
+  forge();
+});
+$("#copyBtn").addEventListener("click", () => {
+  if (!pendingMarker) return;
+  navigator.clipboard?.writeText(markerString(pendingMarker));
+  toast("string copied");
+});
+$("#commitBtn").addEventListener("click", () => {
+  if (!pendingMarker) return;
+  MARKERS.push(pendingMarker);
+  renderCatalog(); populateGraph();
+  toast("committed to registry");
+  $("#genOut").classList.remove("show");
+  // jump to catalog
+  $$(".tab")[0].click();
+  pendingMarker = null;
+});
+
+// ---- drawer -----------------------------------------------------------
+let drawerId = null;
+function openDrawer(id) {
+  const m = MARKERS.find(x=>x.id===id); if (!m) return;
+  drawerId = id;
+  $("#dMarker").innerHTML = markerHTML(m);
+
+  const others = MARKERS.filter(x=>x.id!==id);
+  const feedHTML = m.feeds.length
+    ? m.feeds.map(fid => {
+        const f = MARKERS.find(x=>x.id===fid); if(!f) return "";
+        return `<div class="d-link-item" data-goto="${fid}"><span class="arrow">↳</span> ${escapeHTML(markerString(f))}</div>`;
+      }).join("")
+    : `<div style="color:var(--ink-faint); font-size:11px;">No downstream links. This marker is a chain terminus.</div>`;
+
+  const pickerHTML = others.map(o => {
+    const on = m.feeds.includes(o.id);
+    return `<span class="opt ${on?'on':''}" data-toggle="${o.id}">${o.seed} ${o.verb} ${o.obj}</span>`;
+  }).join("") || `<span style="color:var(--ink-faint); font-size:10px">forge more markers to create links</span>`;
+
+  $("#drawerBody").innerHTML = `
+    <div class="d-section">
+      <div class="lbl">Decode</div>
+      <div class="d-grid">
+        <span class="k">resolves</span><span class="v">${escapeHTML(m.phrase||"—")}</span>
+        <span class="k">seed</span><span class="v" style="color:${seedColor(m.seed)}">${m.seed} · ${(SEEDS[m.seed]||{}).name||"?"}</span>
+        <span class="k">verb</span><span class="v">${m.verb} · ${VERB_LIB[m.verb]||"—"}</span>
+        <span class="k">object</span><span class="v">${m.obj}</span>
+        <span class="k">suffix</span><span class="v">${m.sfx} <span style="color:var(--ink-faint)">(${SFX_GLOSS[m.sfx]||"dual-coded"})</span></span>
+        <span class="k">cycle</span><span class="v">${m.year} → ${m.year+1}</span>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="lbl">Placement</div>
+      <input class="search" id="postEdit" value="${escapeHTML(m.post||"")}" placeholder="where is this posted? e.g. FB / pinned" style="width:100%; margin-bottom:0;">
+    </div>
+
+    <div class="d-section">
+      <div class="lbl">Caption</div>
+      <div class="d-caption">${escapeHTML(m.caption||"— no caption drafted —")}</div>
+    </div>
+
+    <div class="d-section">
+      <div class="lbl">Feeds into</div>
+      ${feedHTML}
+      <div class="mini-link-picker">${pickerHTML}</div>
+    </div>
+
+    <div class="d-section">
+      <button class="del-btn" id="delBtn">Delete instance</button>
+    </div>
+  `;
+
+  // wire interactions
+  $("#postEdit").addEventListener("change", e => {
+    m.post = e.target.value.trim(); renderCatalog();
+  });
+  $$("#drawerBody .opt[data-toggle]").forEach(opt => {
+    opt.addEventListener("click", () => {
+      const tid = opt.dataset.toggle;
+      const i = m.feeds.indexOf(tid);
+      if (i>=0) m.feeds.splice(i,1); else m.feeds.push(tid);
+      openDrawer(id); renderCatalog(); populateGraph();
+    });
+  });
+  $$("#drawerBody .d-link-item[data-goto]").forEach(it => {
+    it.addEventListener("click", () => openDrawer(it.dataset.goto));
+  });
+  $("#delBtn").addEventListener("click", () => {
+    MARKERS = MARKERS.filter(x=>x.id!==id);
+    MARKERS.forEach(x => x.feeds = x.feeds.filter(f=>f!==id));
+    closeDrawer(); renderCatalog(); populateGraph(); toast("instance deleted");
+  });
+
+  $("#scrim").classList.add("open");
+  $("#drawer").classList.add("open");
+}
+function closeDrawer() {
+  $("#scrim").classList.remove("open");
+  $("#drawer").classList.remove("open");
+  drawerId = null;
+}
+$("#drawerClose").addEventListener("click", closeDrawer);
+$("#scrim").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", e => { if (e.key==="Escape") closeDrawer(); });
+
+// ---- search wiring ----------------------------------------------------
+$("#searchBox").addEventListener("input", renderCatalog);
+$("#seedFilter").addEventListener("change", renderCatalog);
+
+// ============================================================
+//   GRAPH  (force-ish layout, hand-rolled, draggable)
+// ============================================================
+let gNodes = [];   // {id, x, y, vx, vy, m}
+let gDrag = null;
+let gAnim = null;
+
+function populateGraph() {
+  const svg = $("#graphSvg");
+  const W = svg.clientWidth || 800, H = svg.clientHeight || 600;
+  // preserve positions for existing nodes
+  const prev = Object.fromEntries(gNodes.map(n=>[n.id,n]));
+  gNodes = MARKERS.map((m,i) => {
+    if (prev[m.id]) return prev[m.id];
+    const angle = (i / Math.max(1,MARKERS.length)) * Math.PI*2;
+    return {
+      id:m.id, m,
+      x: W/2 + Math.cos(angle)*Math.min(W,H)*0.28,
+      y: H/2 + Math.sin(angle)*Math.min(W,H)*0.28,
+      vx:0, vy:0
+    };
+  });
+  if ($("#graphView").classList.contains("active")) drawGraph();
+}
+
+function stepPhysics() {
+  const svg = $("#graphSvg");
+  const W = svg.clientWidth || 800, H = svg.clientHeight || 600;
+  const nodes = gNodes;
+  // repulsion
+  for (let i=0;i<nodes.length;i++) {
+    for (let j=i+1;j<nodes.length;j++) {
+      const a=nodes[i], b=nodes[j];
+      let dx=a.x-b.x, dy=a.y-b.y; let d2=dx*dx+dy*dy||1; let d=Math.sqrt(d2);
+      const rep = 14000/d2;
+      const fx=dx/d*rep, fy=dy/d*rep;
+      if (a!==gDrag){a.vx+=fx; a.vy+=fy;}
+      if (b!==gDrag){b.vx-=fx; b.vy-=fy;}
+    }
+  }
+  // spring along edges
+  MARKERS.forEach(m => {
+    m.feeds.forEach(fid => {
+      const a=nodes.find(n=>n.id===m.id), b=nodes.find(n=>n.id===fid);
+      if(!a||!b) return;
+      let dx=b.x-a.x, dy=b.y-a.y; let d=Math.sqrt(dx*dx+dy*dy)||1;
+      const target=170; const k=(d-target)*0.012;
+      const fx=dx/d*k, fy=dy/d*k;
+      if(a!==gDrag){a.vx+=fx; a.vy+=fy;}
+      if(b!==gDrag){b.vx-=fx; b.vy-=fy;}
+    });
+  });
+  // center gravity + integrate
+  nodes.forEach(n => {
+    if (n===gDrag) return;
+    n.vx += (W/2 - n.x)*0.0016;
+    n.vy += (H/2 - n.y)*0.0016;
+    n.vx*=0.86; n.vy*=0.86;
+    n.x+=n.vx; n.y+=n.vy;
+    n.x=Math.max(70, Math.min(W-70, n.x));
+    n.y=Math.max(45, Math.min(H-45, n.y));
+  });
+}
+
+function drawGraph() {
+  const svg = $("#graphSvg");
+  if (!gNodes.length) { svg.innerHTML = `<text x="50%" y="50%" text-anchor="middle" fill="#424852" font-family="monospace" font-size="12">no markers — forge one to populate the web</text>`; return; }
+
+  let edges = "";
+  MARKERS.forEach(m => {
+    m.feeds.forEach(fid => {
+      const a=gNodes.find(n=>n.id===m.id), b=gNodes.find(n=>n.id===fid);
+      if(!a||!b) return;
+      const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      // arrowhead
+      const ang=Math.atan2(b.y-a.y,b.x-a.x);
+      const ax=mx, ay=my;
+      const s=5;
+      const arrow=`${ax},${ay} ${ax-s*Math.cos(ang-0.5)},${ay-s*Math.sin(ang-0.5)} ${ax-s*Math.cos(ang+0.5)},${ay-s*Math.sin(ang+0.5)}`;
+      edges += `<line class="edge" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>
+                <polygon class="edge-arrow" points="${arrow}"/>`;
+    });
+  });
+
+  let nodesSvg = gNodes.map(n => {
+    const m=n.m; const col=seedColor(m.seed);
+    const w=132, h=46;
+    const orphan = m.feeds.length===0 && !MARKERS.some(o=>o.feeds.includes(m.id));
+    return `<g class="node-g" data-id="${m.id}" transform="translate(${n.x-w/2},${n.y-h/2})">
+      <rect class="node-box" width="${w}" height="${h}" rx="2"
+            fill="var(--panel-2)" stroke="${col}" stroke-width="1.4"
+            stroke-dasharray="${orphan?'4 3':'0'}"/>
+      <rect width="4" height="${h}" fill="${col}"/>
+      <text class="node-label" x="13" y="20">${m.seed} ${m.verb} ${m.obj}</text>
+      <text class="node-sub" x="13" y="34">.${m.year}-${m.sfx} · ${escapeHTML((m.phrase||'').slice(0,16))}</text>
+    </g>`;
+  }).join("");
+
+  svg.innerHTML = edges + nodesSvg;
+
+  // node interactions
+  $$("#graphSvg .node-g").forEach(g => {
+    g.addEventListener("mousedown", e => startDrag(e, g.dataset.id));
+    g.addEventListener("touchstart", e => startDrag(e, g.dataset.id), {passive:false});
+    g.addEventListener("click", e => { if(!g._moved) openDrawer(g.dataset.id); });
+  });
+}
+
+function startDrag(e, id) {
+  e.preventDefault();
+  const n = gNodes.find(x=>x.id===id); if(!n) return;
+  gDrag = n; n._moved=false;
+  runAnim();
+  const move = ev => {
+    const pt = ev.touches ? ev.touches[0] : ev;
+    const r = $("#graphSvg").getBoundingClientRect();
+    n.x = pt.clientX - r.left; n.y = pt.clientY - r.top;
+    n.vx=0; n.vy=0; n._moved=true;
+  };
+  const up = () => {
+    gDrag=null;
+    document.removeEventListener("mousemove",move);
+    document.removeEventListener("mouseup",up);
+    document.removeEventListener("touchmove",move);
+    document.removeEventListener("touchend",up);
+    setTimeout(()=>{ const gg=$(`#graphSvg .node-g[data-id="${id}"]`); if(gg) gg._moved=false; }, 50);
+  };
+  document.addEventListener("mousemove",move);
+  document.addEventListener("mouseup",up);
+  document.addEventListener("touchmove",move,{passive:false});
+  document.addEventListener("touchend",up);
+}
+
+let animFrames = 0;
+function runAnim() {
+  cancelAnimationFrame(gAnim);
+  animFrames = 0;
+  const loop = () => {
+    stepPhysics(); drawGraph();
+    animFrames++;
+    // keep animating while dragging or until settled
+    if (gDrag || animFrames < 140) gAnim = requestAnimationFrame(loop);
+  };
+  gAnim = requestAnimationFrame(loop);
+}
+
+// redraw graph on resize
+let rzTmr;
+window.addEventListener("resize", () => {
+  clearTimeout(rzTmr);
+  rzTmr = setTimeout(()=>{ if($("#graphView").classList.contains("active")){ populateGraph(); runAnim(); } }, 200);
+});
+
+// ---- boot -------------------------------------------------------------
+populateSeedSelectors();
+renderCatalog();
+populateGraph();
+// gentle settle when graph first opened
+$$(".tab")[1].addEventListener("click", () => { populateGraph(); runAnim(); }, {once:false});
+</script>
+</body>
+</html>
