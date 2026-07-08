@@ -1,0 +1,761 @@
+<!-- ResumeForge — checkbox-driven resume builder that exports .docx -->
+<div id="rf-root"></div>
+<style>
+  :root{
+    --bench:#22262b; --bench2:#1b1f23; --panel:#2b3138; --panel2:#333a42;
+    --line:#3d454e; --text:#e8e6e1; --dim:#9aa3ad; --faint:#6b737d;
+    --ink:#2e5c8a; --ink-lt:#79a6d2; --paper:#fbfaf7; --paper-ink:#1a1a1a;
+    --ok:#7fbf7f; --warn:#d9a441;
+  }
+  #rf-root{ font-family:"Segoe UI",system-ui,-apple-system,sans-serif; background:var(--bench);
+    color:var(--text); min-height:100vh; display:flex; flex-direction:column; }
+  #rf-root *{ box-sizing:border-box; }
+  #rf-root input, #rf-root textarea, #rf-root select, #rf-root button{ font-family:inherit; }
+  #rf-root :focus-visible{ outline:2px solid var(--ink-lt); outline-offset:1px; }
+
+  /* ---------- top bar ---------- */
+  .rf-bar{ display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--bench2);
+    border-bottom:1px solid var(--line); flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  .rf-mark{ font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif; font-size:24px; letter-spacing:.5px;
+    font-weight:700; text-transform:uppercase; }
+  .rf-mark b{ color:var(--ink-lt); font-weight:700; }
+  .rf-mark small{ display:block; font-size:10px; letter-spacing:2px; color:var(--faint);
+    font-family:ui-monospace,Menlo,Consolas,monospace; text-transform:uppercase; font-weight:400; }
+  .rf-presets{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .rf-chip{ background:var(--panel); border:1px solid var(--line); color:var(--text); padding:5px 12px;
+    border-radius:99px; font-size:13px; cursor:pointer; }
+  .rf-chip:hover{ border-color:var(--ink-lt); }
+  .rf-chip.active{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .rf-chip .x{ margin-left:7px; color:var(--dim); font-weight:700; }
+  .rf-chip .x:hover{ color:#fff; }
+  .rf-spacer{ flex:1; }
+  .rf-btn{ background:var(--panel); border:1px solid var(--line); color:var(--text); padding:7px 14px;
+    border-radius:6px; font-size:13px; cursor:pointer; }
+  .rf-btn:hover{ border-color:var(--ink-lt); }
+  .rf-btn.primary{ background:var(--ink); border-color:var(--ink); color:#fff; font-weight:600; }
+  .rf-btn.primary:hover{ background:#376ba0; }
+  .rf-btn:disabled{ opacity:.45; cursor:default; }
+  .rf-status{ font-size:11px; color:var(--faint); font-family:ui-monospace,Menlo,Consolas,monospace; min-width:86px; text-align:right; }
+  .rf-status.ok{ color:var(--ok); }
+
+  /* ---------- layout ---------- */
+  .rf-main{ display:flex; flex:1; min-height:0; align-items:stretch; }
+  .rf-editor{ width:46%; min-width:380px; max-width:640px; overflow-y:auto; padding:14px 14px 60px;
+    border-right:1px solid var(--line); }
+  .rf-previewwrap{ flex:1; overflow-y:auto; padding:22px; background:
+    repeating-linear-gradient(45deg, #20242a 0 14px, #1e2228 14px 28px); }
+  @media (max-width: 880px){
+    .rf-main{ flex-direction:column; }
+    .rf-editor{ width:100%; max-width:none; border-right:none; border-bottom:1px solid var(--line); }
+  }
+
+  /* ---------- editor blocks ---------- */
+  .rf-sec{ background:var(--panel); border:1px solid var(--line); border-radius:8px; margin-bottom:12px; overflow:hidden; }
+  .rf-sechead{ display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--panel2);
+    cursor:pointer; user-select:none; }
+  .rf-sechead h3{ margin:0; font-size:12px; letter-spacing:2px; text-transform:uppercase;
+    font-family:ui-monospace,Menlo,Consolas,monospace; color:var(--ink-lt); font-weight:600; flex:1; }
+  .rf-sechead .count{ font-size:11px; color:var(--faint); font-family:ui-monospace,monospace; }
+  .rf-sechead .tri{ color:var(--faint); font-size:11px; transition:transform .15s; }
+  .rf-sec.closed .tri{ transform:rotate(-90deg); }
+  .rf-sec.closed .rf-secbody{ display:none; }
+  .rf-secbody{ padding:10px 12px; }
+
+  .rf-field{ margin-bottom:8px; }
+  .rf-field label{ display:block; font-size:11px; color:var(--dim); margin-bottom:3px; }
+  .rf-field input[type=text], .rf-field textarea{ width:100%; background:var(--bench2); color:var(--text);
+    border:1px solid var(--line); border-radius:5px; padding:7px 9px; font-size:13px; }
+  .rf-field textarea{ resize:vertical; min-height:64px; line-height:1.45; }
+  .rf-field input:focus, .rf-field textarea:focus{ border-color:var(--ink-lt); }
+
+  .rf-entry{ border:1px solid var(--line); border-radius:7px; margin-bottom:10px; background:var(--bench2); }
+  .rf-entry.off{ opacity:.5; }
+  .rf-entryhead{ display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--line); }
+  .rf-entryhead .title{ flex:1; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rf-entryhead .dates{ font-size:11px; color:var(--dim); font-family:ui-monospace,monospace; }
+  .rf-entrybody{ padding:9px 10px; }
+  .rf-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+  .rf-item{ display:flex; align-items:flex-start; gap:8px; padding:5px 0; }
+  .rf-item.off .rf-txt{ opacity:.45; }
+  .rf-item input[type=checkbox]{ margin-top:7px; accent-color:var(--ink); width:15px; height:15px; flex:none; cursor:pointer; }
+  .rf-txt{ flex:1; background:transparent; color:var(--text); border:1px solid transparent; border-radius:5px;
+    padding:5px 7px; font-size:13px; line-height:1.4; resize:none; overflow:hidden; min-height:30px; width:100%; }
+  .rf-txt:hover{ border-color:var(--line); }
+  .rf-txt:focus{ border-color:var(--ink-lt); background:var(--bench2); }
+  .rf-lbl{ width:96px; flex:none; background:transparent; color:var(--ink-lt); border:1px solid transparent;
+    border-radius:5px; padding:5px 7px; font-size:13px; font-weight:600; }
+  .rf-lbl:hover{ border-color:var(--line); }
+  .rf-lbl:focus{ border-color:var(--ink-lt); background:var(--bench2); }
+
+  .rf-mini{ background:none; border:none; color:var(--faint); cursor:pointer; font-size:14px; padding:3px 5px; border-radius:4px; flex:none; }
+  .rf-mini:hover{ color:var(--text); background:var(--panel2); }
+  .rf-add{ background:none; border:1px dashed var(--line); color:var(--dim); width:100%; padding:6px;
+    border-radius:6px; cursor:pointer; font-size:12px; margin-top:4px; }
+  .rf-add:hover{ color:var(--ink-lt); border-color:var(--ink-lt); }
+  .rf-inclbl{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); cursor:pointer; flex:none; }
+  .rf-inclbl input{ accent-color:var(--ink); cursor:pointer; }
+
+  /* ---------- paper preview ---------- */
+  .rf-paperouter{ margin:0 auto; }
+  .rf-paper{ background:var(--paper); color:var(--paper-ink); width:816px; min-height:1056px;
+    box-shadow:0 10px 40px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
+    padding:53px 72px 39px; transform-origin:top left; font-family:"Segoe UI",Calibri,sans-serif; }
+  .rf-paper h1{ text-align:center; font-size:20pt; margin:0 0 2px; color:#1a1a1a; letter-spacing:.5px; }
+  .rf-paper .contact{ text-align:center; font-size:9.5pt; color:#444; margin:0 0 2px; }
+  .rf-paper .contact .lk{ color:#2e5c8a; text-decoration:underline; }
+  .rf-paper h2{ font-size:11pt; color:#2e5c8a; border-bottom:1px solid #2e5c8a; padding-bottom:2px;
+    margin:10px 0 5px; letter-spacing:.3px; }
+  .rf-paper p.body{ font-size:10pt; margin:0 0 4px; line-height:1.32; }
+  .rf-paper .job{ display:flex; align-items:baseline; margin:7px 0 2px; font-size:10pt; }
+  .rf-paper .job .co{ font-weight:700; white-space:nowrap; }
+  .rf-paper .job .meta{ color:#333; margin-left:5px; flex:1; min-width:0; }
+  .rf-paper .job .dt{ color:#555; font-size:9.5pt; white-space:nowrap; margin-left:12px; }
+  .rf-paper ul{ margin:0 0 2px; padding-left:22px; }
+  .rf-paper li{ font-size:10pt; line-height:1.3; margin-bottom:2px; }
+  .rf-paper .sk{ font-size:10pt; margin:0 0 2.5px; }
+  .rf-paper .sk b{ }
+  .rf-paper .empty{ color:#999; text-align:center; font-style:italic; margin-top:200px; }
+  .rf-pagehint{ text-align:center; font-size:11px; color:var(--faint); margin-top:10px;
+    font-family:ui-monospace,monospace; }
+  .rf-pagehint.over{ color:var(--warn); }
+
+  .rf-toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--panel2);
+    border:1px solid var(--line); color:var(--text); padding:9px 16px; border-radius:8px; font-size:13px;
+    box-shadow:0 6px 24px rgba(0,0,0,.5); z-index:20; }
+  @media (prefers-reduced-motion: no-preference){
+    .rf-toast{ animation:rfup .18s ease-out; }
+    @keyframes rfup{ from{ opacity:0; transform:translate(-50%,8px);} to{ opacity:1; transform:translate(-50%,0);} }
+  }
+</style>
+
+<script>
+(function(){
+"use strict";
+var uid = 1; function nid(){ return "i" + (uid++) + "_" + Date.now().toString(36); }
+
+/* ============================================================
+   SEED DATA — Tom's content library
+   ============================================================ */
+function seedState(){
+  function b(on, t){ return { id:nid(), include:on, text:t }; }
+  return {
+    header:{
+      name:"TOMMY FILLIATER",
+      contact:"Cincinnati, Ohio 45231  |  (513) 607-1833  |  tommyfromtheresume@gmail.com",
+      link:"linkedin.com/in/tommyfilliater",
+      tagline:"Front-End Developer  \u00b7  Automation  \u00b7  Internal Tooling"
+    },
+    summary:{ include:true, text:"Front-end web developer with 14 years building branded web experiences, internal tools, and automation that streamline real workflows. Strong across software development, process optimization, client and end-user support, and troubleshooting in fast-paced environments. Known for turning repetitive, manual processes into custom tooling adopted across teams." },
+    experience:[
+      { id:nid(), include:true, company:"Anthology Inc.", note:"formerly Campus Management Corp.", title:"Senior Front-End Web Developer", dates:"2020 \u2013 2024", bullets:[
+        b(true,"Continued front-end ownership of Connect client branding and customization through a second ownership transition."),
+        b(true,"Served as first line of defense for system failures \u2014 identifying, diagnosing, and resolving critical technical issues.")
+      ]},
+      { id:nid(), include:true, company:"Campus Management Corp.", note:"acquired Hobsons\u2019 CRM products", title:"Senior Front-End Web Developer", dates:"2017 \u2013 2020", bullets:[
+        b(true,"Promoted to Senior Front-End Web Developer; maintained client branding and product continuity through acquisition integration."),
+        b(true,"Built out the \u201cFEDS Tool of Awesomeness,\u201d automating case management and project-tracking workflows."),
+        b(true,"Added backend data monitoring \u2014 system health and email delivery statistics \u2014 alongside development work to catch issues early.")
+      ]},
+      { id:nid(), include:true, company:"Hobsons", note:"", title:"Front-End Web Developer", dates:"2011 \u2013 2017", bullets:[
+        b(true,"Converted from contract to full-time hire and promoted from Front-End QA to Front-End Developer within the first year."),
+        b(true,"Delivered client customization requests via Account/Success Managers and direct client contact, consistently turning frustrated clients into happy ones."),
+        b(true,"Built the Annual Updates Scheduling Tool for ApplyYourself and began development of the FEDS internal tooling suite."),
+        b(true,"Expanded beyond core front-end work into microsites, a ground-up chat product, video, Flash, and a custom client game."),
+        b(true,"Sole developer of a custom PHP application for managing consultation appointments at the Hobsons U Conference (2013\u20132019).")
+      ]},
+      { id:nid(), include:true, company:"CBTS", note:"contracted to Hobsons", title:"Front-End QA", dates:"2010 \u2013 2011", bullets:[
+        b(true,"Verified the front-end team\u2019s client deliverables through direct HTML/CSS/JS code review \u2014 the final quality checkpoint before clients.")
+      ]},
+      { id:nid(), include:true, company:"Red Bull", note:"", title:"Student Brand Manager", dates:"2008 \u2013 2009", bullets:[
+        b(true,"Built websites and marketing materials, including viral campaigns for the \u201cCan You Seek\u201d game."),
+        b(true,"Led social media campaigns drawing 1,000+ participants for the Red Bull Soapbox Race in Cincinnati; contributed to the \u201cRed Bull Stash\u201d nationwide promotion (50K hidden products).")
+      ]},
+      /* --- creative library, off by default: flip on for the creative resume --- */
+      { id:nid(), include:false, company:"Puzzleverse Productions / Tom Velle", note:"independent", title:"Video Editor & Content Creator", dates:"2010 \u2013 Present", bullets:[
+        b(true,"15+ years of video editing, motion graphics, and music production across personal brands and client work."),
+        b(true,"Produce daily multi-platform short-form content (YouTube Shorts, TikTok, Instagram Reels, Facebook, X) using series-based growth formats; YouTube Partner Program member."),
+        b(true,"Built and grew Squirrelville, a live wildlife-streaming community, to Twitch VIP status with an interactive Channel-Points engagement model."),
+        b(true,"Develop custom production tooling \u2014 title-card generators, matte and pattern tools, transcription/search pipelines \u2014 to accelerate editing workflows.")
+      ]}
+    ],
+    skills:[
+      { id:nid(), include:true,  label:"Languages:",  text:"HTML, CSS, JavaScript, PHP, SQL, Python, Bash" },
+      { id:nid(), include:true,  label:"Tools:",      text:"Visual Studio Code, Git, GitHub, userscript/automation scripting, custom internal tooling" },
+      { id:nid(), include:true,  label:"Databases:",  text:"SQL databases, Radius CRM, query optimization, data analysis" },
+      { id:nid(), include:true,  label:"Networking:", text:"LAN/WAN troubleshooting, VPN configuration, DNS management" },
+      { id:nid(), include:true,  label:"Other:",      text:"OpenCV, Splunk; audio-production stack (Studio One, Reaper, Melodyne)" },
+      { id:nid(), include:false, label:"Video:",      text:"editing, color grading, motion graphics, speed ramping, multi-platform packaging and captioning" },
+      { id:nid(), include:false, label:"Audio:",      text:"Studio One, Reaper, Melodyne, MIDI production and arrangement (mido/Python)" }
+    ],
+    projects:[
+      b(true,"Custom automation tools \u2014 workflow-optimization scripts and internal tools adopted company-wide for technical support and client management."),
+      b(true,"Squirrelville \u2014 founder of a live wildlife-streaming community built from the ground up to Twitch VIP status, with an interactive Channel-Points engagement model."),
+      b(true,"Independent creative work (2010\u2013present) \u2014 video, animation, and music under Puzzleverse Productions."),
+      b(false,"Fan edit series production \u2014 multi-platform packaging, style guides, and daily publishing cadence across YouTube, TikTok, Instagram, and Facebook."),
+      b(false,"Production tool suite \u2014 browser-based title, matte, pattern, and caption tools built to speed up my own editing pipeline.")
+    ],
+    education:[
+      { id:nid(), include:true, label:"Xavier University", text:"\u2014 B.S., Computer Science; Minor in Information Technology \u00b7 English (fluent), Spanish (conversational)" }
+    ]
+  };
+}
+
+/* ============================================================
+   STATE + STORAGE
+   ============================================================ */
+var state = seedState();
+var presets = {};        // name -> deep-copied state
+var activePreset = null;
+var saveTimer = null;
+var STORE_KEY = "resumeforge-data";
+
+function deep(o){ return JSON.parse(JSON.stringify(o)); }
+
+function setStatus(txt, ok){
+  var el = document.getElementById("rf-status");
+  if(el){ el.textContent = txt; el.className = "rf-status" + (ok ? " ok" : ""); }
+}
+function scheduleSave(){
+  setStatus("editing\u2026", false);
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveAll, 800);
+}
+async function saveAll(){
+  try{
+    var res = await window.storage.set(STORE_KEY, JSON.stringify({ state:state, presets:presets, activePreset:activePreset }));
+    setStatus(res ? "saved" : "save failed", !!res);
+  }catch(e){ setStatus("save failed", false); }
+}
+async function loadAll(){
+  try{
+    var res = await window.storage.get(STORE_KEY);
+    if(res && res.value){
+      var d = JSON.parse(res.value);
+      if(d.state) state = d.state;
+      if(d.presets) presets = d.presets;
+      activePreset = d.activePreset || null;
+    }
+  }catch(e){ /* first run: key doesn't exist yet */ }
+  if(Object.keys(presets).length === 0){
+    presets["Developer"] = deep(state);
+    presets["Creative"]  = makeCreativePreset();
+    activePreset = "Developer";
+    saveAll();
+  }
+}
+function makeCreativePreset(){
+  var s = deep(state);
+  s.header.name = "TOM VELLE";
+  s.header.contact = "Cincinnati, Ohio  |  (513) 607-1833  |  your-creative-email@example.com";
+  s.header.link = "youtube.com/@realtomvelle";
+  s.header.tagline = "Video Editor  \u00b7  Motion Graphics  \u00b7  Content Strategy";
+  s.summary.text = "Video editor and content creator with 15+ years across editing, motion graphics, and music production. Runs multiple daily-publishing brands with series-based growth strategies spanning YouTube, TikTok, Instagram, and Facebook. Builds custom production tooling to move faster than the feed.";
+  s.experience.forEach(function(e){
+    if(e.company.indexOf("Puzzleverse") === 0){ e.include = true; }
+    if(e.company === "Red Bull"){ e.include = true; }
+    if(e.company === "CBTS"){ e.include = false; }
+    if(e.company === "Hobsons"){
+      e.bullets.forEach(function(bl){
+        bl.include = /microsites|chat product|video|game|Conference/i.test(bl.text);
+      });
+    }
+    if(e.company === "Campus Management Corp."){ e.bullets.forEach(function(bl){ bl.include = /FEDS/.test(bl.text); }); }
+    if(e.company === "Anthology Inc."){ e.bullets.forEach(function(bl,i){ bl.include = (i===0); }); }
+  });
+  // creative entry first
+  s.experience.sort(function(a,b){
+    return (b.company.indexOf("Puzzleverse")===0 ? 1:0) - (a.company.indexOf("Puzzleverse")===0 ? 1:0);
+  });
+  s.skills.forEach(function(k){
+    k.include = /Video:|Audio:|Languages:|Tools:/.test(k.label);
+  });
+  s.projects.forEach(function(p,i){ p.include = (i !== 0); });
+  return s;
+}
+
+/* ============================================================
+   HELPERS to locate items by id
+   ============================================================ */
+function findExp(id){ for(var i=0;i<state.experience.length;i++) if(state.experience[i].id===id) return i; return -1; }
+function findIn(arr,id){ for(var i=0;i<arr.length;i++) if(arr[i].id===id) return i; return -1; }
+
+/* ============================================================
+   EDITOR RENDERING
+   ============================================================ */
+var openSecs = { header:true, summary:true, experience:true, skills:false, projects:false, education:false };
+
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function renderEditor(){
+  var el = document.getElementById("rf-editor");
+  var h = "";
+
+  h += sec("header","Header & Identity","",
+    fld("Name","header.name",state.header.name) +
+    fld("Contact line","header.contact",state.header.contact) +
+    "<div class='rf-grid2'>" +
+      fld("Link","header.link",state.header.link) +
+      fld("Tagline","header.tagline",state.header.tagline) +
+    "</div>");
+
+  h += sec("summary","Summary", chk("summary.include",state.summary.include,"include"),
+    "<div class='rf-field'><textarea data-bind='summary.text' rows='4'>"+esc(state.summary.text)+"</textarea></div>");
+
+  var expBody = "";
+  state.experience.forEach(function(e, idx){
+    var bl = "";
+    e.bullets.forEach(function(b){
+      bl += "<div class='rf-item "+(b.include?"":"off")+"'>" +
+        "<input type='checkbox' data-tog='bullet' data-exp='"+e.id+"' data-id='"+b.id+"' "+(b.include?"checked":"")+" aria-label='include bullet'>" +
+        "<textarea class='rf-txt' data-btxt data-exp='"+e.id+"' data-id='"+b.id+"' rows='1'>"+esc(b.text)+"</textarea>" +
+        "<button class='rf-mini' data-del='bullet' data-exp='"+e.id+"' data-id='"+b.id+"' title='Delete bullet'>\u00d7</button>" +
+        "</div>";
+    });
+    expBody +=
+      "<div class='rf-entry "+(e.include?"":"off")+"'>" +
+        "<div class='rf-entryhead'>" +
+          "<label class='rf-inclbl'><input type='checkbox' data-tog='exp' data-id='"+e.id+"' "+(e.include?"checked":"")+"></label>" +
+          "<span class='title'>"+esc(e.company||"(untitled)")+"</span>" +
+          "<span class='dates'>"+esc(e.dates)+"</span>" +
+          "<button class='rf-mini' data-move='-1' data-id='"+e.id+"' title='Move up' "+(idx===0?"disabled":"")+">\u2191</button>" +
+          "<button class='rf-mini' data-move='1' data-id='"+e.id+"' title='Move down' "+(idx===state.experience.length-1?"disabled":"")+">\u2193</button>" +
+          "<button class='rf-mini' data-del='exp' data-id='"+e.id+"' title='Delete entry'>\u00d7</button>" +
+        "</div>" +
+        "<div class='rf-entrybody'>" +
+          "<div class='rf-grid2'>" +
+            fldE("Company","company",e) + fldE("Note (parenthetical)","note",e) +
+            fldE("Title","title",e) + fldE("Dates","dates",e) +
+          "</div>" +
+          bl +
+          "<button class='rf-add' data-addbullet='"+e.id+"'>+ bullet</button>" +
+        "</div>" +
+      "</div>";
+  });
+  expBody += "<button class='rf-add' id='rf-addexp'>+ experience entry</button>";
+  h += sec("experience","Experience","",expBody);
+
+  var skBody = "";
+  state.skills.forEach(function(k){
+    skBody += "<div class='rf-item "+(k.include?"":"off")+"'>" +
+      "<input type='checkbox' data-tog='skill' data-id='"+k.id+"' "+(k.include?"checked":"")+" aria-label='include skill line'>" +
+      "<input type='text' class='rf-lbl' data-sklbl data-id='"+k.id+"' value='"+esc(k.label)+"'>" +
+      "<textarea class='rf-txt' data-sktxt data-id='"+k.id+"' rows='1'>"+esc(k.text)+"</textarea>" +
+      "<button class='rf-mini' data-del='skill' data-id='"+k.id+"' title='Delete line'>\u00d7</button></div>";
+  });
+  skBody += "<button class='rf-add' id='rf-addskill'>+ skills line</button>";
+  h += sec("skills","Technical Skills","",skBody);
+
+  var prBody = "";
+  state.projects.forEach(function(p){
+    prBody += "<div class='rf-item "+(p.include?"":"off")+"'>" +
+      "<input type='checkbox' data-tog='proj' data-id='"+p.id+"' "+(p.include?"checked":"")+" aria-label='include project'>" +
+      "<textarea class='rf-txt' data-prtxt data-id='"+p.id+"' rows='1'>"+esc(p.text)+"</textarea>" +
+      "<button class='rf-mini' data-del='proj' data-id='"+p.id+"' title='Delete project'>\u00d7</button></div>";
+  });
+  prBody += "<button class='rf-add' id='rf-addproj'>+ project</button>";
+  h += sec("projects","Projects","",prBody);
+
+  var edBody = "";
+  state.education.forEach(function(k){
+    edBody += "<div class='rf-item "+(k.include?"":"off")+"'>" +
+      "<input type='checkbox' data-tog='edu' data-id='"+k.id+"' "+(k.include?"checked":"")+" aria-label='include education line'>" +
+      "<input type='text' class='rf-lbl' data-edlbl data-id='"+k.id+"' value='"+esc(k.label)+"'>" +
+      "<textarea class='rf-txt' data-edtxt data-id='"+k.id+"' rows='1'>"+esc(k.text)+"</textarea>" +
+      "<button class='rf-mini' data-del='edu' data-id='"+k.id+"' title='Delete line'>\u00d7</button></div>";
+  });
+  edBody += "<button class='rf-add' id='rf-addedu'>+ line</button>";
+  h += sec("education","Education & More","",edBody);
+
+  el.innerHTML = h;
+  el.querySelectorAll("textarea.rf-txt").forEach(autosize);
+
+  function sec(key, title, extra, body){
+    return "<div class='rf-sec "+(openSecs[key]?"":"closed")+"' data-sec='"+key+"'>" +
+      "<div class='rf-sechead' data-toggle='"+key+"'><span class='tri'>\u25bc</span><h3>"+title+"</h3>"+extra+"</div>" +
+      "<div class='rf-secbody'>"+body+"</div></div>";
+  }
+  function fld(lbl, bind, val){
+    return "<div class='rf-field'><label>"+lbl+"</label><input type='text' data-bind='"+bind+"' value='"+esc(val)+"'></div>";
+  }
+  function fldE(lbl, key, e){
+    return "<div class='rf-field'><label>"+lbl+"</label><input type='text' data-ebind='"+key+"' data-id='"+e.id+"' value='"+esc(e[key])+"'></div>";
+  }
+  function chk(bind, on, lbl){
+    return "<label class='rf-inclbl' data-stop><input type='checkbox' data-bindchk='"+bind+"' "+(on?"checked":"")+"> "+lbl+"</label>";
+  }
+}
+function autosize(t){ t.style.height="auto"; t.style.height=(t.scrollHeight)+"px"; }
+
+/* ---------- editor events (delegated) ---------- */
+function wireEditor(){
+  var ed = document.getElementById("rf-editor");
+
+  ed.addEventListener("click", function(ev){
+    var t = ev.target;
+    var head = t.closest("[data-toggle]");
+    if(head && !t.closest("[data-stop]") && t.tagName !== "INPUT"){
+      var k = head.getAttribute("data-toggle");
+      openSecs[k] = !openSecs[k];
+      head.closest(".rf-sec").classList.toggle("closed", !openSecs[k]);
+      return;
+    }
+    if(t.id === "rf-addexp"){
+      state.experience.push({ id:nid(), include:true, company:"New Company", note:"", title:"Title", dates:"20XX \u2013 20XX",
+        bullets:[{ id:nid(), include:true, text:"What you did there." }] });
+      touchStructure(); return;
+    }
+    if(t.dataset.addbullet){
+      var e = state.experience[findExp(t.dataset.addbullet)];
+      if(e){ e.bullets.push({ id:nid(), include:true, text:"" }); touchStructure(); }
+      return;
+    }
+    if(t.id === "rf-addskill"){ state.skills.push({ id:nid(), include:true, label:"Label:", text:"" }); touchStructure(); return; }
+    if(t.id === "rf-addproj"){ state.projects.push({ id:nid(), include:true, text:"" }); touchStructure(); return; }
+    if(t.id === "rf-addedu"){ state.education.push({ id:nid(), include:true, label:"", text:"" }); touchStructure(); return; }
+
+    if(t.dataset.move){
+      var i = findExp(t.dataset.id), d = parseInt(t.dataset.move,10), j = i+d;
+      if(i>-1 && j>=0 && j<state.experience.length){
+        var tmp = state.experience[i]; state.experience[i]=state.experience[j]; state.experience[j]=tmp;
+        touchStructure();
+      } return;
+    }
+    if(t.dataset.del){
+      var kind = t.dataset.del;
+      if(kind==="exp"){ var i2=findExp(t.dataset.id); if(i2>-1 && confirm("Delete this experience entry?")) state.experience.splice(i2,1); }
+      if(kind==="bullet"){ var e2=state.experience[findExp(t.dataset.exp)]; if(e2){ var bi=findIn(e2.bullets,t.dataset.id); if(bi>-1) e2.bullets.splice(bi,1); } }
+      if(kind==="skill"){ var si=findIn(state.skills,t.dataset.id); if(si>-1) state.skills.splice(si,1); }
+      if(kind==="proj"){ var pi=findIn(state.projects,t.dataset.id); if(pi>-1) state.projects.splice(pi,1); }
+      if(kind==="edu"){ var ei=findIn(state.education,t.dataset.id); if(ei>-1) state.education.splice(ei,1); }
+      touchStructure(); return;
+    }
+  });
+
+  ed.addEventListener("change", function(ev){
+    var t = ev.target;
+    if(t.dataset.tog){
+      var kind = t.dataset.tog;
+      if(kind==="exp"){ var e=state.experience[findExp(t.dataset.id)]; if(e) e.include=t.checked; }
+      if(kind==="bullet"){ var e2=state.experience[findExp(t.dataset.exp)]; if(e2){ var b=e2.bullets[findIn(e2.bullets,t.dataset.id)]; if(b) b.include=t.checked; } }
+      if(kind==="skill"){ var k=state.skills[findIn(state.skills,t.dataset.id)]; if(k) k.include=t.checked; }
+      if(kind==="proj"){ var p=state.projects[findIn(state.projects,t.dataset.id)]; if(p) p.include=t.checked; }
+      if(kind==="edu"){ var d=state.education[findIn(state.education,t.dataset.id)]; if(d) d.include=t.checked; }
+      var row = t.closest(".rf-item") || t.closest(".rf-entry");
+      if(row) row.classList.toggle("off", !t.checked);
+      touchContent(); return;
+    }
+    if(t.dataset.bindchk){
+      var path = t.dataset.bindchk.split(".");
+      state[path[0]][path[1]] = t.checked;
+      touchContent(); return;
+    }
+  });
+
+  ed.addEventListener("input", function(ev){
+    var t = ev.target;
+    if(t.tagName==="TEXTAREA") autosize(t);
+    if(t.dataset.bind){
+      var p = t.dataset.bind.split(".");
+      state[p[0]][p[1]] = t.value; touchContent(); return;
+    }
+    if(t.dataset.ebind){
+      var e = state.experience[findExp(t.dataset.id)];
+      if(e){ e[t.dataset.ebind] = t.value;
+        var head = t.closest(".rf-entry");
+        if(head){
+          if(t.dataset.ebind==="company") head.querySelector(".title").textContent = t.value || "(untitled)";
+          if(t.dataset.ebind==="dates") head.querySelector(".dates").textContent = t.value;
+        }
+        touchContent(); }
+      return;
+    }
+    if(t.dataset.btxt !== undefined && t.dataset.exp){
+      var e2 = state.experience[findExp(t.dataset.exp)];
+      if(e2){ var b=e2.bullets[findIn(e2.bullets,t.dataset.id)]; if(b){ b.text=t.value; touchContent(); } }
+      return;
+    }
+    if(t.dataset.sklbl !== undefined){ var k=state.skills[findIn(state.skills,t.dataset.id)]; if(k){ k.label=t.value; touchContent(); } return; }
+    if(t.dataset.sktxt !== undefined){ var k2=state.skills[findIn(state.skills,t.dataset.id)]; if(k2){ k2.text=t.value; touchContent(); } return; }
+    if(t.dataset.prtxt !== undefined){ var p2=state.projects[findIn(state.projects,t.dataset.id)]; if(p2){ p2.text=t.value; touchContent(); } return; }
+    if(t.dataset.edlbl !== undefined){ var d=state.education[findIn(state.education,t.dataset.id)]; if(d){ d.label=t.value; touchContent(); } return; }
+    if(t.dataset.edtxt !== undefined){ var d2=state.education[findIn(state.education,t.dataset.id)]; if(d2){ d2.text=t.value; touchContent(); } return; }
+  });
+}
+
+function touchContent(){ renderPreview(); scheduleSave(); }
+function touchStructure(){ renderEditor(); renderPreview(); scheduleSave(); }
+
+/* ============================================================
+   PREVIEW
+   ============================================================ */
+function renderPreview(){
+  var paper = document.getElementById("rf-paper");
+  var h = "";
+  h += "<h1>"+esc(state.header.name)+"</h1>";
+  if(state.header.contact) h += "<p class='contact'>"+esc(state.header.contact)+"</p>";
+  if(state.header.link || state.header.tagline)
+    h += "<p class='contact'><span class='lk'>"+esc(state.header.link)+"</span>&nbsp;&nbsp;&nbsp;&nbsp;"+esc(state.header.tagline)+"</p>";
+
+  if(state.summary.include && state.summary.text.trim()){
+    h += "<h2>SUMMARY</h2><p class='body'>"+esc(state.summary.text)+"</p>";
+  }
+  var exps = state.experience.filter(function(e){ return e.include; });
+  if(exps.length){
+    h += "<h2>EXPERIENCE</h2>";
+    exps.forEach(function(e){
+      var meta = (e.note ? "("+esc(e.note)+")&nbsp; " : "") + "\u2014&nbsp; " + esc(e.title);
+      h += "<div class='job'><span class='co'>"+esc(e.company)+"</span><span class='meta'>&nbsp;"+meta+"</span><span class='dt'>"+esc(e.dates)+"</span></div>";
+      var bs = e.bullets.filter(function(b){ return b.include && b.text.trim(); });
+      if(bs.length){ h += "<ul>"; bs.forEach(function(b){ h += "<li>"+esc(b.text)+"</li>"; }); h += "</ul>"; }
+    });
+  }
+  var sks = state.skills.filter(function(k){ return k.include && (k.text.trim()||k.label.trim()); });
+  if(sks.length){
+    h += "<h2>TECHNICAL SKILLS</h2>";
+    sks.forEach(function(k){ h += "<p class='sk'><b>"+esc(k.label)+"</b> "+esc(k.text)+"</p>"; });
+  }
+  var prs = state.projects.filter(function(p){ return p.include && p.text.trim(); });
+  if(prs.length){
+    h += "<h2>PROJECTS</h2><ul>";
+    prs.forEach(function(p){ h += "<li>"+esc(p.text)+"</li>"; });
+    h += "</ul>";
+  }
+  var eds = state.education.filter(function(k){ return k.include && (k.text.trim()||k.label.trim()); });
+  if(eds.length){
+    h += "<h2>EDUCATION &amp; MORE</h2>";
+    eds.forEach(function(k){ h += "<p class='sk'><b>"+esc(k.label)+"</b> "+esc(k.text)+"</p>"; });
+  }
+  if(!h) h = "<p class='empty'>Nothing checked \u2014 tick some boxes on the left.</p>";
+  paper.innerHTML = h;
+
+  // one-page hint (paper is 1056px tall at padding 53/39)
+  var hint = document.getElementById("rf-pagehint");
+  var usable = 1056 - 53 - 39;
+  var used = paper.scrollHeight - 53 - 39;
+  var over = paper.scrollHeight > 1056 + 2;
+  hint.textContent = over
+    ? "\u26a0 over one page by ~" + Math.ceil((paper.scrollHeight-1056)/16) + " lines \u2014 uncheck something or tighten text"
+    : "fits on one page \u2014 " + Math.round(100*used/usable) + "% full";
+  hint.className = "rf-pagehint" + (over ? " over" : "");
+  fitPaper();
+}
+function fitPaper(){
+  var wrap = document.getElementById("rf-previewwrap");
+  var outer = document.getElementById("rf-paperouter");
+  var paper = document.getElementById("rf-paper");
+  var avail = wrap.clientWidth - 44;
+  var s = Math.min(1, avail/816);
+  paper.style.transform = "scale("+s+")";
+  outer.style.width = (816*s)+"px";
+  outer.style.height = (Math.max(paper.scrollHeight,1056)*s)+"px";
+}
+
+/* ============================================================
+   PRESETS
+   ============================================================ */
+function renderPresets(){
+  var el = document.getElementById("rf-presets");
+  var h = "";
+  Object.keys(presets).forEach(function(name){
+    h += "<span class='rf-chip "+(name===activePreset?"active":"")+"' data-preset='"+esc(name)+"' role='button' tabindex='0'>" +
+      esc(name) + "<span class='x' data-delpreset='"+esc(name)+"' title='Delete preset'>\u00d7</span></span>";
+  });
+  h += "<button class='rf-btn' id='rf-savepreset' title='Snapshot everything \u2014 checkboxes, text, name \u2014 under a name'>+ save preset</button>";
+  el.innerHTML = h;
+}
+function wirePresets(){
+  document.getElementById("rf-presets").addEventListener("click", function(ev){
+    var t = ev.target;
+    if(t.dataset.delpreset){
+      ev.stopPropagation();
+      if(confirm("Delete preset \u201c"+t.dataset.delpreset+"\u201d?")){
+        delete presets[t.dataset.delpreset];
+        if(activePreset===t.dataset.delpreset) activePreset=null;
+        renderPresets(); scheduleSave();
+      }
+      return;
+    }
+    var chip = t.closest("[data-preset]");
+    if(chip){
+      var name = chip.dataset.preset;
+      state = deep(presets[name]);
+      activePreset = name;
+      renderPresets(); renderEditor(); renderPreview(); scheduleSave();
+      toast("Loaded \u201c"+name+"\u201d");
+      return;
+    }
+    if(t.id==="rf-savepreset"){
+      var nm = prompt("Preset name:", activePreset || "");
+      if(nm){ presets[nm]=deep(state); activePreset=nm; renderPresets(); scheduleSave(); toast("Saved \u201c"+nm+"\u201d"); }
+    }
+  });
+}
+function toast(msg){
+  var t = document.createElement("div");
+  t.className="rf-toast"; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 2200);
+}
+
+/* ============================================================
+   DOCX EXPORT — mirrors the hand-built Word file exactly
+   ============================================================ */
+var docxReady = false;
+var DOCX_URLS = [
+  "https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/docx/7.8.2/docx.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/docx/7.8.2/docx.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/docx/7.3.0/docx.min.js"
+];
+function loadDocx(i){
+  if(i>=DOCX_URLS.length){ setDlState(false,"library failed to load"); return; }
+  var s = document.createElement("script");
+  s.src = DOCX_URLS[i];
+  s.onload = function(){
+    if(window.docx && window.docx.Document){ docxReady=true; setDlState(true); }
+    else loadDocx(i+1);
+  };
+  s.onerror = function(){ loadDocx(i+1); };
+  document.head.appendChild(s);
+}
+function setDlState(ok,msg){
+  var btn = document.getElementById("rf-download");
+  btn.disabled = !ok;
+  btn.textContent = ok ? "\u2b07 Download .docx" : ("\u2b07 "+(msg||"loading\u2026"));
+}
+
+function buildDoc(){
+  var d = window.docx;
+  var P = d.Paragraph, R = d.TextRun;
+
+  function run(text, opts){
+    opts = opts || {};
+    return new R({ text:text, bold:!!opts.b, color:opts.color, size:opts.size });
+  }
+  var kids = [];
+
+  // header
+  kids.push(new P({ alignment:d.AlignmentType.CENTER, spacing:{after:30},
+    children:[ run(state.header.name,{b:true,color:"1A1A1A",size:40}) ] }));
+  if(state.header.contact)
+    kids.push(new P({ alignment:d.AlignmentType.CENTER, spacing:{after:40},
+      children:[ run(state.header.contact,{color:"444444",size:19}) ] }));
+  if(state.header.link || state.header.tagline)
+    kids.push(new P({ alignment:d.AlignmentType.CENTER, spacing:{after:60},
+      children:[ run(state.header.link,{color:"2E5C8A",size:19}),
+                 run("      "+state.header.tagline,{color:"444444",size:19}) ] }));
+
+  function heading(txt){
+    kids.push(new P({ spacing:{before:90,after:40},
+      border:{ bottom:{ style:d.BorderStyle.SINGLE, size:6, color:"2E5C8A", space:2 } },
+      children:[ run(txt,{b:true,color:"2E5C8A",size:22}) ] }));
+  }
+  function bullet(txt){
+    kids.push(new P({ numbering:{ reference:"rfdots", level:0 }, spacing:{after:8},
+      children:[ run(txt,{size:20}) ] }));
+  }
+  function jobHeader(e){
+    var meta = (e.note ? " ("+e.note+")" : "") + "  \u2014  " + e.title;
+    var dateRun;
+    try{ dateRun = new R({ children:[ new d.Tab(), e.dates ], color:"555555", size:19 }); }
+    catch(err){ dateRun = run("\t"+e.dates,{color:"555555",size:19}); }
+    kids.push(new P({
+      tabStops:[{ type:d.TabStopType.RIGHT, position:9360 }],
+      spacing:{before:60,after:6},
+      children:[ run(e.company,{b:true}), run(meta,{color:"333333",size:20}), dateRun ] }));
+  }
+
+  if(state.summary.include && state.summary.text.trim()){
+    heading("SUMMARY");
+    kids.push(new P({ spacing:{after:40}, children:[ run(state.summary.text,{size:20}) ] }));
+  }
+  var exps = state.experience.filter(function(e){ return e.include; });
+  if(exps.length){
+    heading("EXPERIENCE");
+    exps.forEach(function(e){
+      jobHeader(e);
+      e.bullets.filter(function(b){ return b.include && b.text.trim(); })
+        .forEach(function(b){ bullet(b.text); });
+    });
+  }
+  var sks = state.skills.filter(function(k){ return k.include && (k.text.trim()||k.label.trim()); });
+  if(sks.length){
+    heading("TECHNICAL SKILLS");
+    sks.forEach(function(k){
+      kids.push(new P({ spacing:{after:20},
+        children:[ run(k.label,{b:true,size:20}), run("  "+k.text,{size:20}) ] }));
+    });
+  }
+  var prs = state.projects.filter(function(p){ return p.include && p.text.trim(); });
+  if(prs.length){ heading("PROJECTS"); prs.forEach(function(p){ bullet(p.text); }); }
+  var eds = state.education.filter(function(k){ return k.include && (k.text.trim()||k.label.trim()); });
+  if(eds.length){
+    heading("EDUCATION & MORE");
+    eds.forEach(function(k){
+      kids.push(new P({ spacing:{after:10},
+        children:[ run(k.label,{b:true,size:20}), run(" "+k.text,{size:20}) ] }));
+    });
+  }
+
+  return new d.Document({
+    numbering:{ config:[{ reference:"rfdots",
+      levels:[{ level:0, format:d.LevelFormat.BULLET, text:"\u2022", alignment:d.AlignmentType.LEFT,
+        style:{ paragraph:{ indent:{ left:720, hanging:360 } } } }] }] },
+    sections:[{
+      properties:{ page:{
+        size:{ width:12240, height:15840 },
+        margin:{ top:800, right:1080, bottom:580, left:1080 } } },
+      children:kids
+    }]
+  });
+}
+
+async function downloadDocx(){
+  if(!docxReady) return;
+  try{
+    var doc = buildDoc();
+    var blob = await window.docx.Packer.toBlob(doc);
+    var name = (state.header.name||"Resume").replace(/[^\w]+/g,"-").replace(/^-+|-+$/g,"");
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name + "-Resume.docx";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    toast("Downloaded " + a.download);
+  }catch(e){
+    console.error(e);
+    toast("Export failed: " + e.message);
+  }
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+document.getElementById("rf-root").innerHTML =
+  "<div class='rf-bar'>" +
+    "<div class='rf-mark'>Resume<b>Forge</b><small>content library \u00b7 checkbox \u00b7 export</small></div>" +
+    "<div class='rf-presets' id='rf-presets'></div>" +
+    "<div class='rf-spacer'></div>" +
+    "<span class='rf-status' id='rf-status'>loading\u2026</span>" +
+    "<button class='rf-btn primary' id='rf-download' disabled>\u2b07 loading\u2026</button>" +
+  "</div>" +
+  "<div class='rf-main'>" +
+    "<div class='rf-editor' id='rf-editor'></div>" +
+    "<div class='rf-previewwrap' id='rf-previewwrap'>" +
+      "<div class='rf-paperouter' id='rf-paperouter'><div class='rf-paper' id='rf-paper'></div></div>" +
+      "<div class='rf-pagehint' id='rf-pagehint'></div>" +
+    "</div>" +
+  "</div>";
+
+loadAll().then(function(){
+  renderPresets(); renderEditor(); renderPreview();
+  wireEditor(); wirePresets();
+  setStatus("saved", true);
+});
+document.getElementById("rf-download").addEventListener("click", downloadDocx);
+window.addEventListener("resize", fitPaper);
+loadDocx(0);
+})();
+</script>

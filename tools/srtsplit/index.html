@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>splitsville ~ srt word splitter</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #000;
+    color: #ccc;
+    font: 11px Verdana, Tahoma, Arial, sans-serif;
+    padding: 24px 10px 60px;
+  }
+  a { color: #ff66cc; }
+  .page { max-width: 680px; margin: 0 auto; }
+
+  .header { text-align: center; margin-bottom: 16px; }
+  .header h1 {
+    margin: 0;
+    font: bold 26px "Comic Sans MS", "Comic Sans", cursive;
+    color: #ff66cc;
+    letter-spacing: 1px;
+  }
+  .header p { margin: 4px 0 0; color: #777; }
+
+  .box { border: 1px solid #ff66cc; background: #0a0a0a; margin-bottom: 10px; }
+  .box-hd {
+    background: linear-gradient(#ff66cc, #cc0099);
+    color: #fff;
+    font-weight: bold;
+    padding: 3px 8px;
+    text-shadow: 1px 1px 0 #660044;
+  }
+  .box-bd { padding: 10px; }
+
+  .drop {
+    border: 2px dashed #663355;
+    background: #0f000c;
+    padding: 16px 10px;
+    text-align: center;
+    cursor: pointer;
+    color: #cc88bb;
+  }
+  .drop.over { border-color: #ff66cc; background: #1c0016; }
+  .drop b { color: #fff; }
+  .drop:focus-visible { outline: 2px solid #ff66cc; }
+
+  textarea {
+    width: 100%;
+    min-height: 110px;
+    margin-top: 8px;
+    background: #000;
+    color: #3f3;
+    border: 1px inset #666;
+    padding: 8px;
+    font: 11px "Courier New", monospace;
+    resize: vertical;
+  }
+  textarea:focus-visible { outline: 2px solid #ff66cc; }
+
+  .opts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+  .opts label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .opts .grp { color: #777; font-weight: bold; }
+  input[type="radio"], input[type="checkbox"] { accent-color: #ff66cc; }
+  input[type="number"] {
+    width: 60px; background: #000; color: #3f3;
+    border: 1px inset #666; padding: 2px 5px;
+    font: 11px "Courier New", monospace;
+  }
+
+  .actions { margin: 4px 0 12px; }
+  button {
+    font: bold 11px Verdana, sans-serif;
+    background: #d4d0c8;
+    color: #000;
+    border: 2px outset #fff;
+    padding: 5px 14px;
+    cursor: pointer;
+    margin-right: 6px;
+  }
+  button:active { border-style: inset; }
+  button:disabled { color: #888; cursor: default; }
+  button.hot {
+    background: linear-gradient(#ff66cc, #cc0099);
+    color: #fff;
+    border-color: #ffaadd #660044 #660044 #ffaadd;
+    text-shadow: 1px 1px 0 #660044;
+  }
+  button:focus-visible { outline: 2px solid #ff66cc; }
+
+  .stats { color: #777; font-family: "Courier New", monospace; margin-bottom: 10px; }
+  .stats b { color: #ff66cc; }
+
+  .cue-row { border: 1px dashed #333; background: #0d0d0d; padding: 6px; margin-bottom: 6px; }
+  .cue-meta { display: flex; justify-content: space-between; gap: 8px; color: #777; margin-bottom: 5px; flex-wrap: wrap; }
+  .cue-meta .tc { color: #cc88bb; font-family: "Courier New", monospace; }
+  .strip { display: flex; gap: 2px; height: 26px; }
+  .chip {
+    background: #16000f;
+    border: 1px solid #663355;
+    color: #ddaacc;
+    display: flex; align-items: center; justify-content: center;
+    font: bold 10px Verdana, sans-serif;
+    overflow: hidden; white-space: nowrap;
+    padding: 0 2px; min-width: 0;
+    position: relative;
+  }
+  .chip:hover { background: #ff66cc; border-color: #ff66cc; color: #fff; z-index: 2; overflow: visible; }
+  .chip:hover::after {
+    content: attr(data-tc);
+    position: absolute;
+    bottom: calc(100% + 3px);
+    left: 50%; transform: translateX(-50%);
+    background: #000; border: 1px solid #ff66cc; color: #3f3;
+    font: 10px "Courier New", monospace;
+    padding: 2px 6px; white-space: nowrap; pointer-events: none;
+  }
+  .empty { color: #555; text-align: center; padding: 20px 0; font-style: italic; }
+
+  .toast {
+    position: fixed; bottom: 18px; left: 50%;
+    transform: translateX(-50%) translateY(90px);
+    background: #000; border: 1px solid #ff66cc; color: #ffaadd;
+    padding: 8px 16px; font-weight: bold;
+    transition: transform .25s; z-index: 10;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .footer { text-align: center; color: #444; margin-top: 16px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>splitsville</h1>
+    <p>srt in, one word per cue out</p>
+  </div>
+
+  <div class="box">
+    <div class="box-hd">load an srt</div>
+    <div class="box-bd">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Load an SRT file">
+        <b>drop ur .srt here</b> or click 2 browse<br>
+        <small>or paste it below</small>
+        <input type="file" id="file" accept=".srt,.txt,.vtt" hidden>
+      </div>
+      <textarea id="src" placeholder="1&#10;00:00:04,733 --> 00:00:06,766&#10;YANKEE DOODLE BOY" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="box-hd">settings</div>
+    <div class="box-bd opts">
+      <span class="grp">timing:</span>
+      <label><input type="radio" name="mode" value="weighted" checked> by word length</label>
+      <label><input type="radio" name="mode" value="equal"> equal split</label>
+      <span class="grp">min word:</span>
+      <label><input type="number" id="minms" value="0" min="0" step="50"> ms</label>
+      <label><input type="checkbox" id="gap"> 1ms gap</label>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="hot" id="dl" disabled>download word-split srt</button>
+    <button id="copy" disabled>copy</button>
+    <button id="clear">clear</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="box">
+    <div class="box-hd">word timeline</div>
+    <div class="box-bd">
+      <div id="tracks"><div class="empty">nothing loaded yet</div></div>
+    </div>
+  </div>
+
+  <div class="footer">splitsville is in ur extended network</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let outText = "";
+let baseName = "word_split";
+
+function parseTime(t) {
+  const m = t.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+  if (!m) return null;
+  return (+m[1]*3600 + +m[2]*60 + +m[3]) * 1000 + +m[4].padEnd(3, "0").slice(0, 3);
+}
+function fmtTime(ms) {
+  ms = Math.max(0, Math.round(ms));
+  const h = Math.floor(ms/3600000); ms %= 3600000;
+  const m = Math.floor(ms/60000); ms %= 60000;
+  const s = Math.floor(ms/1000); ms %= 1000;
+  const p = (n, w) => String(n).padStart(w, "0");
+  return `${p(h,2)}:${p(m,2)}:${p(s,2)},${p(ms,3)}`;
+}
+
+function parseSRT(text) {
+  const blocks = text.replace(/\r/g, "").trim().split(/\n\s*\n/);
+  const cues = [];
+  for (const b of blocks) {
+    const lines = b.split("\n").filter(l => l.trim());
+    const ti = lines.findIndex(l => l.includes("-->"));
+    if (ti < 0) continue;
+    const [a, z] = lines[ti].split("-->");
+    const start = parseTime(a), end = parseTime(z);
+    if (start == null || end == null || end <= start) continue;
+    const words = lines.slice(ti + 1).join(" ")
+      .replace(/<[^>]*>/g, "")
+      .split(/\s+/).filter(Boolean);
+    if (words.length) cues.push({ start, end, words });
+  }
+  return cues;
+}
+
+function splitCues(cues, mode, minMs, gap) {
+  const out = [];
+  for (const c of cues) {
+    const n = c.words.length;
+    const dur = c.end - c.start;
+    let weights = mode === "equal"
+      ? c.words.map(() => 1)
+      : c.words.map(w => w.length + 1);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let durs = weights.map(w => dur * w / total);
+
+    if (minMs > 0 && minMs * n <= dur) {
+      const extra = durs.map(d => Math.max(0, d - minMs));
+      const extraTotal = extra.reduce((a, b) => a + b, 0);
+      const spare = dur - minMs * n;
+      durs = extra.map(e => minMs + (extraTotal ? spare * e / extraTotal : spare / n));
+    }
+
+    let t = c.start;
+    for (let i = 0; i < n; i++) {
+      const wEnd = i === n - 1 ? c.end : Math.round(t + durs[i]);
+      out.push({ start: Math.round(t), end: gap && i < n - 1 ? wEnd - 1 : wEnd, word: c.words[i], cue: c });
+      t = wEnd;
+    }
+  }
+  return out;
+}
+
+function buildSRT(words) {
+  return words.map((w, i) =>
+    `${i + 1}\n${fmtTime(w.start)} --> ${fmtTime(w.end)}\n${w.word}\n`
+  ).join("\n") + "\n";
+}
+
+function render() {
+  const text = $("src").value;
+  const cues = parseSRT(text);
+  const tracks = $("tracks");
+
+  if (!cues.length) {
+    tracks.innerHTML = '<div class="empty">nothing loaded yet</div>';
+    $("stats").textContent = "";
+    $("dl").disabled = $("copy").disabled = true;
+    outText = "";
+    return;
+  }
+
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const minMs = +$("minms").value || 0;
+  const gap = $("gap").checked;
+  const words = splitCues(cues, mode, minMs, gap);
+  outText = buildSRT(words);
+
+  $("stats").innerHTML = `<b>${cues.length}</b> cues &rarr; <b>${words.length}</b> word cues`;
+  $("dl").disabled = $("copy").disabled = false;
+
+  tracks.innerHTML = "";
+  let wi = 0;
+  for (const c of cues) {
+    const row = document.createElement("div");
+    row.className = "cue-row";
+    const meta = document.createElement("div");
+    meta.className = "cue-meta";
+    meta.innerHTML = `<span>${c.words.join(" ")}</span><span class="tc">${fmtTime(c.start)} &rarr; ${fmtTime(c.end)}</span>`;
+    const strip = document.createElement("div");
+    strip.className = "strip";
+    const dur = c.end - c.start;
+    while (wi < words.length && words[wi].cue === c) {
+      const w = words[wi];
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      chip.style.flex = `${(w.end - w.start) / dur} 1 0`;
+      chip.textContent = w.word;
+      chip.setAttribute("data-tc", `${fmtTime(w.start)} \u2192 ${fmtTime(w.end)}`);
+      strip.appendChild(chip);
+      wi++;
+    }
+    row.append(meta, strip);
+    tracks.appendChild(row);
+  }
+}
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// --- wiring ---
+const drop = $("drop"), fileInput = $("file");
+drop.addEventListener("click", () => fileInput.click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
+["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(f) {
+  baseName = f.name.replace(/\.[^.]+$/, "") + "_words";
+  const r = new FileReader();
+  r.onload = () => { $("src").value = r.result; render(); };
+  r.readAsText(f);
+}
+
+$("src").addEventListener("input", render);
+document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener("change", render));
+$("minms").addEventListener("input", render);
+$("gap").addEventListener("change", render);
+
+$("dl").addEventListener("click", () => {
+  const blob = new Blob([outText], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = baseName + ".srt";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("downloaded");
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(outText); toast("copied"); }
+  catch { toast("copy failed, select it manually"); }
+});
+$("clear").addEventListener("click", () => { $("src").value = ""; baseName = "word_split"; render(); });
+</script>
+</body>
+</html>
