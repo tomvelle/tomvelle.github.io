@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShelfForge &middot; Puzzleverse Productions</title>
+<meta name="description" content="Editor for the Puzzleverse shelf data file. Load series.js, edit tapes, save it back.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --tape-black: #0c0b10;
+    --panel: #14121a;
+    --panel-2: #1a1724;
+    --phosphor: #e8e6df;
+    --osd-cyan: #5ee3e6;
+    --bleed-magenta: #ff3d7f;
+    --label-cream: #efe3c2;
+    --dim: #8a8794;
+    --danger: #ff5c5c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--tape-black);
+    color: var(--phosphor);
+    font-family: "VT323", monospace;
+    min-height: 100vh;
+  }
+
+  /* scanlines, same as the site */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,.028) 0px,
+      rgba(255,255,255,.028) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 18px 26px;
+    border-bottom: 1px solid rgba(138,135,148,.3);
+    position: sticky;
+    top: 0;
+    background: rgba(12,11,16,.92);
+    backdrop-filter: blur(3px);
+    z-index: 6;
+  }
+  header h1 {
+    font-family: "Bungee", sans-serif;
+    font-size: clamp(1.2rem, 3vw, 1.7rem);
+    letter-spacing: .02em;
+  }
+  header h1 .accent { color: var(--bleed-magenta); }
+  .file-status {
+    color: var(--dim);
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    letter-spacing: .08em;
+    flex: 1;
+    min-width: 160px;
+  }
+  .file-status .dirty { color: var(--bleed-magenta); }
+
+  .btn {
+    font: inherit;
+    font-size: clamp(1rem, 2vw, 1.15rem);
+    letter-spacing: .08em;
+    color: var(--osd-cyan);
+    background: transparent;
+    border: 2px solid var(--osd-cyan);
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+    text-shadow: 0 0 8px rgba(94,227,230,.35);
+  }
+  .btn:hover:not(:disabled), .btn:focus-visible {
+    background: var(--osd-cyan);
+    color: var(--tape-black);
+    text-shadow: none;
+  }
+  .btn:focus-visible { outline: 2px dashed var(--phosphor); outline-offset: 3px; }
+  .btn:disabled { color: var(--dim); border-color: rgba(138,135,148,.4); cursor: default; text-shadow: none; }
+  .btn.quiet { color: var(--dim); border-color: rgba(138,135,148,.5); text-shadow: none; }
+  .btn.quiet:hover:not(:disabled), .btn.quiet:focus-visible { background: var(--dim); color: var(--tape-black); }
+  .btn.danger { color: var(--danger); border-color: var(--danger); text-shadow: none; }
+  .btn.danger:hover, .btn.danger:focus-visible { background: var(--danger); color: var(--tape-black); }
+  .btn.tiny { padding: 2px 10px; font-size: 1rem; border-width: 1px; }
+
+  /* ---- empty state ---- */
+  #emptyState {
+    max-width: 560px;
+    margin: 12vh auto;
+    text-align: center;
+    border: 1px dashed rgba(138,135,148,.4);
+    padding: 44px 32px;
+  }
+  #emptyState .big {
+    color: var(--osd-cyan);
+    font-size: clamp(1.4rem, 3.4vw, 2rem);
+    letter-spacing: .16em;
+    text-shadow: 0 0 8px rgba(94,227,230,.5);
+    margin-bottom: 14px;
+  }
+  #emptyState p {
+    color: var(--dim);
+    font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+  #emptyState .row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  /* ---- workspace ---- */
+  #workspace {
+    display: none;
+    grid-template-columns: minmax(280px, 380px) 1fr;
+    gap: 24px;
+    padding: 24px 26px 60px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  #workspace.on { display: grid; }
+
+  .col-title {
+    color: var(--dim);
+    letter-spacing: .2em;
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+  }
+
+  /* tape list */
+  #tapeList { display: flex; flex-direction: column; gap: 6px; }
+  .row-tape {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    align-items: stretch;
+    background: linear-gradient(to bottom, #232030, #17141f 55%, #232030);
+    border: 1px solid rgba(0,0,0,.7);
+    cursor: pointer;
+    min-height: 46px;
+  }
+  .row-tape.selected { outline: 2px solid var(--osd-cyan); outline-offset: -2px; }
+  .row-tape .stripe { background: var(--bleed-magenta); }
+  .row-tape .info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    min-width: 0;
+  }
+  .row-tape .sticker {
+    background: var(--label-cream);
+    color: #16141c;
+    font-size: 1.05rem;
+    letter-spacing: .06em;
+    padding: 2px 8px 0;
+    transform: rotate(-.6deg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .row-tape .date {
+    color: var(--dim);
+    font-size: .95rem;
+    white-space: nowrap;
+  }
+  .row-tape .ops {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+  }
+  .row-tape .ops button {
+    font: inherit;
+    font-size: 1rem;
+    color: var(--dim);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+  .row-tape .ops button:hover { color: var(--osd-cyan); }
+  .row-tape .ops button.del:hover { color: var(--danger); }
+
+  #addTape { margin-top: 12px; width: 100%; }
+
+  /* editor form */
+  #editor {
+    background: var(--panel);
+    border: 1px solid rgba(138,135,148,.3);
+    padding: 24px;
+  }
+  #editor.blank { display: flex; align-items: center; justify-content: center; color: var(--dim); min-height: 300px; letter-spacing: .14em; }
+
+  .preview-spine {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: stretch;
+    background: linear-gradient(to bottom, #232030, #17141f 55%, #232030);
+    border: 1px solid rgba(0,0,0,.7);
+    min-height: 58px;
+    margin-bottom: 26px;
+  }
+  .preview-spine .stripe { background: var(--bleed-magenta); }
+  .preview-spine .face { display: flex; align-items: center; gap: 14px; padding: 8px 14px; min-width: 0; }
+  .preview-spine .sticker {
+    background: var(--label-cream);
+    color: #16141c;
+    font-size: 1.3rem;
+    letter-spacing: .08em;
+    padding: 3px 12px 1px;
+    transform: rotate(-.6deg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .preview-spine .desc { color: var(--dim); font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .preview-spine .runtime {
+    display: flex; align-items: center; padding: 0 16px;
+    color: var(--dim); font-size: 1rem; letter-spacing: .12em;
+    border-left: 1px dashed rgba(138,135,148,.3); white-space: nowrap;
+  }
+
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    color: var(--osd-cyan);
+    letter-spacing: .14em;
+    font-size: 1.05rem;
+    margin-bottom: 6px;
+  }
+  .field .hint { color: var(--dim); font-size: .95rem; letter-spacing: .04em; margin-top: 4px; }
+  .field input[type="text"], .field input[type="date"], .field input[type="url"], .field textarea {
+    width: 100%;
+    font: inherit;
+    font-size: 1.15rem;
+    color: var(--phosphor);
+    background: var(--panel-2);
+    border: 1px solid rgba(138,135,148,.4);
+    padding: 8px 12px;
+  }
+  .field textarea { min-height: 110px; resize: vertical; line-height: 1.4; }
+  .field input:focus-visible, .field textarea:focus-visible {
+    outline: 2px dashed var(--osd-cyan);
+    outline-offset: 2px;
+  }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+  .stripe-row { display: flex; gap: 10px; align-items: center; }
+  .stripe-row input[type="color"] {
+    width: 46px; height: 40px; padding: 2px;
+    background: var(--panel-2); border: 1px solid rgba(138,135,148,.4); cursor: pointer;
+  }
+  .stripe-row input[type="text"] { flex: 1; }
+
+  .kv-rows { display: flex; flex-direction: column; gap: 8px; }
+  .kv-row { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 8px; }
+  .kv-row input {
+    font: inherit; font-size: 1.05rem;
+    color: var(--phosphor); background: var(--panel-2);
+    border: 1px solid rgba(138,135,148,.4); padding: 6px 10px;
+    min-width: 0;
+  }
+  .kv-row input:focus-visible { outline: 2px dashed var(--osd-cyan); outline-offset: 2px; }
+  .kv-add { margin-top: 8px; }
+
+  @media (max-width: 860px) {
+    #workspace { grid-template-columns: 1fr; }
+    .field-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SHELF<span class="accent">FORGE</span></h1>
+  <span class="file-status" id="fileStatus">No file loaded</span>
+  <button class="btn" id="btnLoad">LOAD SERIES.JS</button>
+  <button class="btn quiet" id="btnFresh">START FRESH</button>
+  <button class="btn" id="btnSave" disabled>SAVE</button>
+  <button class="btn quiet" id="btnDownload" disabled>DOWNLOAD COPY</button>
+</header>
+
+<input type="file" id="filePick" accept=".js,.json" hidden>
+
+<div id="emptyState">
+  <div class="big">NO TAPE IN THE DECK</div>
+  <p>Load your series.js to edit the shelf, or start fresh to build a new one. Saving writes the file back in place when the browser allows it, and downloads a copy when it does not.</p>
+  <div class="row">
+    <button class="btn" id="btnLoad2">LOAD SERIES.JS</button>
+    <button class="btn quiet" id="btnFresh2">START FRESH</button>
+  </div>
+</div>
+
+<div id="workspace">
+  <div>
+    <div class="col-title">TAPES ON THE SHELF</div>
+    <div id="tapeList"></div>
+    <button class="btn" id="addTape">+ ADD TAPE</button>
+  </div>
+  <div id="editor" class="blank">SELECT A TAPE TO EDIT</div>
+</div>
+
+<script>
+(() => {
+  const VAR_NAME = 'SERIES_DATA';
+  let data = null;          // the array of tape objects
+  let selected = -1;        // index into data
+  let fileHandle = null;    // FileSystemFileHandle when available
+  let fileName = 'series.js';
+  let dirty = false;
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    status: $('fileStatus'), save: $('btnSave'), download: $('btnDownload'),
+    empty: $('emptyState'), workspace: $('workspace'),
+    list: $('tapeList'), editor: $('editor'), filePick: $('filePick')
+  };
+
+  /* ---------- file in ---------- */
+
+  async function loadViaPicker() {
+    if (window.showOpenFilePicker) {
+      try {
+        [fileHandle] = await window.showOpenFilePicker({
+          types: [{ description: 'Shelf data', accept: { 'text/javascript': ['.js'], 'application/json': ['.json'] } }]
+        });
+        const file = await fileHandle.getFile();
+        fileName = file.name;
+        parseText(await file.text());
+      } catch (e) { /* user cancelled */ }
+    } else {
+      els.filePick.click();
+    }
+  }
+
+  els.filePick.addEventListener('change', async () => {
+    const file = els.filePick.files[0];
+    if (!file) return;
+    fileHandle = null; // no write access via this route
+    fileName = file.name;
+    parseText(await file.text());
+    els.filePick.value = '';
+  });
+
+  function parseText(text) {
+    try {
+      let body = text.replace(/^\uFEFF/, '').trim();
+      const eq = body.indexOf('=');
+      if (eq !== -1 && /window|var|let|const/.test(body.slice(0, eq))) body = body.slice(eq + 1);
+      body = body.trim().replace(/;\s*$/, '');
+      const parsed = JSON.parse(body);
+      if (!Array.isArray(parsed)) throw new Error('Expected an array');
+      data = parsed;
+      selected = data.length ? 0 : -1;
+      setDirty(false);
+      showWorkspace();
+    } catch (err) {
+      alert('Could not read that file as shelf data.\n' + err.message +
+            '\nExpected: window.SERIES_DATA = [ ... ]; or a plain JSON array.');
+    }
+  }
+
+  function startFresh() {
+    if (dirty && !confirm('Unsaved changes will be lost. Start fresh anyway?')) return;
+    data = [];
+    fileHandle = null;
+    fileName = 'series.js';
+    selected = -1;
+    setDirty(false);
+    showWorkspace();
+    addTape();
+  }
+
+  /* ---------- file out ---------- */
+
+  function serialize() {
+    return 'window.' + VAR_NAME + ' =\n' + JSON.stringify(data, null, 2) + '\n;\n';
+  }
+
+  async function save() {
+    if (!data) return;
+    if (fileHandle) {
+      try {
+        const writable = await fileHandle.createWritable();
+        await writable.write(serialize());
+        await writable.close();
+        setDirty(false);
+        flashStatus('SAVED ' + fileName.toUpperCase());
+        return;
+      } catch (err) {
+        alert('Could not write to the file (' + err.message + '). Downloading a copy instead.');
+      }
+    }
+    download();
+  }
+
+  function download() {
+    if (!data) return;
+    const blob = new Blob([serialize()], { type: 'text/javascript' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setDirty(false);
+    flashStatus('DOWNLOADED ' + fileName.toUpperCase());
+  }
+
+  /* ---------- state / chrome ---------- */
+
+  function showWorkspace() {
+    els.empty.style.display = 'none';
+    els.workspace.classList.add('on');
+    els.save.disabled = false;
+    els.download.disabled = false;
+    renderList();
+    renderEditor();
+    updateStatus();
+  }
+
+  function setDirty(v) {
+    dirty = v;
+    updateStatus();
+  }
+
+  function updateStatus() {
+    if (!data) { els.status.textContent = 'No file loaded'; return; }
+    const mode = fileHandle ? '' : ' (download-only mode)';
+    els.status.innerHTML = fileName + mode + (dirty ? ' <span class="dirty">&#9679; UNSAVED</span>' : '');
+  }
+
+  let flashTimer = null;
+  function flashStatus(msg) {
+    els.status.textContent = msg;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(updateStatus, 2200);
+  }
+
+  window.addEventListener('beforeunload', e => {
+    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      save();
+    }
+  });
+
+  /* ---------- tape list ---------- */
+
+  function renderList() {
+    els.list.innerHTML = '';
+    data.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'row-tape' + (i === selected ? ' selected' : '');
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+
+      const stripe = document.createElement('span');
+      stripe.className = 'stripe';
+      if (item.stripe) stripe.style.background = item.stripe;
+
+      const info = document.createElement('span');
+      info.className = 'info';
+      const sticker = document.createElement('span');
+      sticker.className = 'sticker';
+      sticker.textContent = item.title || 'UNTITLED';
+      const date = document.createElement('span');
+      date.className = 'date';
+      date.textContent = item.date || '';
+      info.append(sticker, date);
+
+      const ops = document.createElement('span');
+      ops.className = 'ops';
+      const mk = (label, title, fn, cls) => {
+        const b = document.createElement('button');
+        b.innerHTML = label;
+        b.title = title;
+        if (cls) b.className = cls;
+        b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+        return b;
+      };
+      ops.append(
+        mk('&#9650;', 'Move up', () => moveTape(i, -1)),
+        mk('&#9660;', 'Move down', () => moveTape(i, 1)),
+        mk('&#10005;', 'Delete tape', () => deleteTape(i), 'del')
+      );
+
+      row.append(stripe, info, ops);
+      const pick = () => { selected = i; renderList(); renderEditor(); };
+      row.addEventListener('click', pick);
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+      els.list.appendChild(row);
+    });
+  }
+
+  function moveTape(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= data.length) return;
+    [data[i], data[j]] = [data[j], data[i]];
+    if (selected === i) selected = j;
+    else if (selected === j) selected = i;
+    setDirty(true);
+    renderList();
+  }
+
+  function deleteTape(i) {
+    const name = data[i].title || 'this tape';
+    if (!confirm('Delete ' + name + '? No undo.')) return;
+    data.splice(i, 1);
+    if (selected >= data.length) selected = data.length - 1;
+    setDirty(true);
+    renderList();
+    renderEditor();
+  }
+
+  function addTape() {
+    const today = new Date().toISOString().slice(0, 10);
+    data.push({
+      title: 'NEW TAPE',
+      date: today,
+      tagline: '',
+      badge: '',
+      stripe: '#ff3d7f',
+      description: '',
+      specs: {},
+      links: []
+    });
+    selected = data.length - 1;
+    setDirty(true);
+    renderList();
+    renderEditor();
+  }
+
+  /* ---------- editor form ---------- */
+
+  function renderEditor() {
+    const ed = els.editor;
+    ed.innerHTML = '';
+    if (selected < 0 || !data[selected]) {
+      ed.classList.add('blank');
+      ed.textContent = 'SELECT A TAPE TO EDIT';
+      return;
+    }
+    ed.classList.remove('blank');
+    const item = data[selected];
+
+    /* live spine preview */
+    const prev = document.createElement('div');
+    prev.className = 'preview-spine';
+    prev.innerHTML = '<span class="stripe"></span>' +
+      '<span class="face"><span class="sticker"></span><span class="desc"></span></span>' +
+      '<span class="runtime"></span>';
+    ed.appendChild(prev);
+    const pv = {
+      stripe: prev.querySelector('.stripe'),
+      sticker: prev.querySelector('.sticker'),
+      desc: prev.querySelector('.desc'),
+      runtime: prev.querySelector('.runtime')
+    };
+    function refreshPreview() {
+      pv.stripe.style.background = item.stripe || 'var(--bleed-magenta)';
+      pv.sticker.textContent = item.title || 'UNTITLED';
+      pv.desc.textContent = item.tagline || '';
+      pv.runtime.textContent = item.badge || '';
+    }
+
+    const field = (labelText, node, hint) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
+      const label = document.createElement('label');
+      label.textContent = labelText;
+      wrap.append(label, node);
+      if (hint) {
+        const h = document.createElement('div');
+        h.className = 'hint';
+        h.textContent = hint;
+        wrap.appendChild(h);
+      }
+      return wrap;
+    };
+
+    const textInput = (key, refreshesPreview) => {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = item[key] || '';
+      inp.addEventListener('input', () => {
+        item[key] = inp.value;
+        setDirty(true);
+        if (refreshesPreview) refreshPreview();
+        if (key === 'title' || key === 'date') syncListRow();
+      });
+      return inp;
+    };
+
+    function syncListRow() {
+      const row = els.list.children[selected];
+      if (!row) return;
+      row.querySelector('.sticker').textContent = item.title || 'UNTITLED';
+      row.querySelector('.date').textContent = item.date || '';
+      row.querySelector('.stripe').style.background = item.stripe || '';
+    }
+
+    /* title + date */
+    const grid1 = document.createElement('div');
+    grid1.className = 'field-grid';
+    grid1.appendChild(field('TITLE', textInput('title', true)));
+    const dateInp = document.createElement('input');
+    dateInp.type = 'date';
+    dateInp.value = item.date || '';
+    dateInp.addEventListener('input', () => { item.date = dateInp.value; setDirty(true); syncListRow(); });
+    grid1.appendChild(field('DATE', dateInp, 'Shows on the spine and drawer; drives newest-first sorting'));
+    ed.appendChild(grid1);
+
+    /* tagline + badge */
+    const grid2 = document.createElement('div');
+    grid2.className = 'field-grid';
+    grid2.appendChild(field('TAGLINE', textInput('tagline', true), 'Short line on the spine, hidden on mobile'));
+    grid2.appendChild(field('BADGE', textInput('badge', true), 'Right-side tag, e.g. ONGOING / SERIES / MUSIC'));
+    ed.appendChild(grid2);
+
+    /* stripe */
+    const stripeRow = document.createElement('div');
+    stripeRow.className = 'stripe-row';
+    const swatch = document.createElement('input');
+    swatch.type = 'color';
+    const stripeText = document.createElement('input');
+    stripeText.type = 'text';
+    stripeText.value = item.stripe || '';
+    if (/^#[0-9a-f]{6}$/i.test(item.stripe || '')) swatch.value = item.stripe;
+    swatch.addEventListener('input', () => {
+      stripeText.value = swatch.value;
+      item.stripe = swatch.value;
+      setDirty(true); refreshPreview(); syncListRow();
+    });
+    stripeText.addEventListener('input', () => {
+      item.stripe = stripeText.value;
+      if (/^#[0-9a-f]{6}$/i.test(stripeText.value)) swatch.value = stripeText.value;
+      setDirty(true); refreshPreview(); syncListRow();
+    });
+    stripeRow.append(swatch, stripeText);
+    ed.appendChild(field('STRIPE COLOR', stripeRow, 'Any CSS color works; the swatch handles hex'));
+
+    /* description */
+    const desc = document.createElement('textarea');
+    desc.value = item.description || '';
+    desc.addEventListener('input', () => { item.description = desc.value; setDirty(true); });
+    ed.appendChild(field('DESCRIPTION', desc, 'Shown in the open drawer'));
+
+    /* specs */
+    ed.appendChild(kvEditor('SPECS', 'Key/value rows in the drawer, e.g. FORMAT / STATUS / HOME',
+      () => Object.entries(item.specs || {}),
+      rows => {
+        item.specs = {};
+        rows.forEach(([k, v]) => { if (k.trim()) item.specs[k.trim()] = v; });
+      },
+      ['KEY', 'VALUE']));
+
+    /* links */
+    ed.appendChild(kvEditor('LINKS', 'Buttons in the drawer; label + full URL',
+      () => (item.links || []).map(l => [l.label || '', l.url || '']),
+      rows => {
+        item.links = rows
+          .filter(([label, url]) => label.trim() || url.trim())
+          .map(([label, url]) => ({ label: label.trim(), url: url.trim() }));
+      },
+      ['LABEL', 'URL']));
+
+    refreshPreview();
+
+    /* generic two-column row editor used for specs and links */
+    function kvEditor(labelText, hint, getRows, commit, placeholders) {
+      const holder = document.createElement('div');
+      holder.className = 'kv-rows';
+
+      function commitAll() {
+        const rows = [...holder.querySelectorAll('.kv-row')].map(r => {
+          const [a, b] = r.querySelectorAll('input');
+          return [a.value, b.value];
+        });
+        commit(rows);
+        setDirty(true);
+      }
+
+      function addRow(k = '', v = '') {
+        const row = document.createElement('div');
+        row.className = 'kv-row';
+        const a = document.createElement('input');
+        a.placeholder = placeholders[0];
+        a.value = k;
+        const b = document.createElement('input');
+        b.placeholder = placeholders[1];
+        b.value = v;
+        [a, b].forEach(inp => inp.addEventListener('input', commitAll));
+        const del = document.createElement('button');
+        del.className = 'btn danger tiny';
+        del.type = 'button';
+        del.textContent = 'X';
+        del.title = 'Remove row';
+        del.addEventListener('click', () => { row.remove(); commitAll(); });
+        row.append(a, b, del);
+        holder.appendChild(row);
+      }
+
+      getRows().forEach(([k, v]) => addRow(k, v));
+
+      const add = document.createElement('button');
+      add.className = 'btn quiet tiny kv-add';
+      add.type = 'button';
+      add.textContent = '+ ADD ROW';
+      add.addEventListener('click', () => addRow());
+
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
+      const label = document.createElement('label');
+      label.textContent = labelText;
+      const h = document.createElement('div');
+      h.className = 'hint';
+      h.textContent = hint;
+      wrap.append(label, holder, add, h);
+      return wrap;
+    }
+  }
+
+  /* ---------- wire up ---------- */
+
+  $('btnLoad').addEventListener('click', loadViaPicker);
+  $('btnLoad2').addEventListener('click', loadViaPicker);
+  $('btnFresh').addEventListener('click', startFresh);
+  $('btnFresh2').addEventListener('click', startFresh);
+  $('btnSave').addEventListener('click', save);
+  $('btnDownload').addEventListener('click', download);
+  $('addTape').addEventListener('click', addTape);
+})();
+</script>
+
+</body>
+</html>
