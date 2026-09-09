@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Physics Toy</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0b0e;
+    --panel: #14161c;
+    --line: #262a34;
+    --text: #e8e9ee;
+    --dim: #8b90a0;
+    --accent: #6ee7f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  #brand {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sep { width: 1px; align-self: stretch; min-height: 26px; background: var(--line); }
+
+  button {
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    background: #1c1f28;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 11px;
+    cursor: pointer;
+    line-height: 1;
+    transition: background .12s, border-color .12s, color .12s;
+    white-space: nowrap;
+  }
+  button:hover { background: #242833; border-color: #39404f; }
+  button.tool .key {
+    color: var(--dim);
+    font-weight: 500;
+    margin-left: 5px;
+    font-size: 10px;
+  }
+  button.tool.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #06212a;
+  }
+  button.tool.active .key { color: #06212a; opacity: .65; }
+  button.ghost { background: transparent; color: var(--dim); }
+  button.ghost:hover { color: var(--text); }
+
+  label.slider {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  label.slider input { width: 74px; accent-color: var(--accent); }
+  label.slider b { color: var(--text); font-weight: 600; min-width: 30px; font-variant-numeric: tabular-nums; }
+
+  #stage { position: relative; flex: 1; min-height: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+  #hud {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-size: 11px;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+    line-height: 1.5;
+  }
+  #hint {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 11px;
+    color: var(--dim);
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    text-align: right;
+    max-width: 60%;
+  }
+  #hint-tool { color: var(--text); }
+  #paused {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  body.is-paused #paused { display: flex; }
+
+  @media (max-width: 720px) {
+    #brand, .sep { display: none; }
+    #hint .desktop-only { display: none; }
+    #bar { gap: 10px; padding: 7px 10px; }
+    button { padding: 6px 9px; }
+    button.tool .key { display: none; }
+    label.slider input { width: 62px; }
+    /* stack the hint under the stats line instead of colliding with it */
+    #hint {
+      top: 28px;
+      left: 12px;
+      right: 12px;
+      max-width: none;
+      align-items: flex-start;
+      text-align: left;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div id="brand">physics toy</div>
+
+  <div class="group" id="tools"></div>
+
+  <div class="sep"></div>
+
+  <div class="group">
+    <label class="slider">grav <input id="s-grav" type="range" min="0" max="3000" step="50" value="1400"><b id="v-grav">1400</b></label>
+    <label class="slider">bounce <input id="s-bounce" type="range" min="0" max="0.95" step="0.05" value="0.45"><b id="v-bounce">.45</b></label>
+    <label class="slider">size <input id="s-size" type="range" min="6" max="46" step="1" value="14"><b id="v-size">14</b></label>
+    <label class="slider">speed <input id="s-speed" type="range" min="0.1" max="2" step="0.1" value="1"><b id="v-speed">1.0</b></label>
+  </div>
+
+  <div class="sep"></div>
+
+  <div class="group">
+    <button class="ghost" id="btn-pause">Pause <span class="key">space</span></button>
+    <button class="ghost" id="btn-demo">Demo</button>
+    <button class="ghost" id="btn-clear">Clear</button>
+  </div>
+</div>
+
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="hud"></div>
+  <div id="paused">paused</div>
+  <div id="hint">
+    <span id="hint-tool"></span>
+    <span class="desktop-only">shift = repel / unpin &nbsp;·&nbsp; 1-8 tools &nbsp;·&nbsp; space pause &nbsp;·&nbsp; C clear</span>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---------------------------------------------------------------- setup */
+
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const hud = document.getElementById('hud');
+  const hintTool = document.getElementById('hint-tool');
+
+  let W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, r.width);
+    H = Math.max(1, r.height);
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  new ResizeObserver(resize).observe(cv);
+  resize();
+
+  /* ---------------------------------------------------------------- world */
+
+  const MAX_POINTS = 2600;
+  const SUBSTEPS = 4;
+  const ITERATIONS = 4;
+  const DT = 1 / 60;
+  const AIR_DRAG = 0.9992;
+
+  let points = [];
+  let sticks = [];
+  let bodies = [];   // cloth sheets / blobs, kept for surface rendering
+  let uid = 1;
+
+  const cfg = {
+    gravity: 1400,
+    bounce: 0.45,
+    size: 14,
+    speed: 1,
+    wallFriction: 0.12,
+  };
+
+  const PALETTE = ['#6ee7f0', '#f7b955', '#f2647c', '#8bd450', '#b38bfa', '#59a5f5', '#ff8a5c', '#4ad6a8'];
+  let colorIdx = 0;
+  const nextColor = () => PALETTE[colorIdx++ % PALETTE.length];
+
+  function addPoint(x, y, o) {
+    o = o || {};
+    const r = o.r === undefined ? 6 : o.r;
+    const pinned = !!o.pinned;
+    const mass = o.mass === undefined ? Math.max(0.25, (r * r) / 100) : o.mass;
+    const p = {
+      id: uid++,
+      x, y,
+      px: x - (o.vx || 0) * DT,
+      py: y - (o.vy || 0) * DT,
+      r,
+      inv: pinned ? 0 : 1 / mass,
+      baseInv: pinned ? 0 : 1 / mass,
+      pinned,
+      collide: o.collide !== false,
+      color: o.color || '#7d8496',
+      free: !!o.free,       // a loose ball (safe to recycle when full)
+      mesh: !!o.mesh,       // part of a rope/cloth/blob: drawn via its links, not as a circle
+      links: null,
+      i: 0,
+    };
+    points.push(p);
+    return p;
+  }
+
+  function link(a, b, opts) {
+    opts = opts || {};
+    const s = {
+      a, b,
+      len: opts.len === undefined ? Math.hypot(b.x - a.x, b.y - a.y) : opts.len,
+      stiff: opts.stiff === undefined ? 1 : opts.stiff,
+      w: opts.w === undefined ? 2 : opts.w,
+      hide: !!opts.hide,
+      dim: !!opts.dim,
+      color: opts.color || null,   // overrides the strain tint
+    };
+    sticks.push(s);
+    (a.links || (a.links = new Set())).add(b.id);
+    (b.links || (b.links = new Set())).add(a.id);
+    return s;
+  }
+
+  const linked = (a, b) => !!(a.links && a.links.has(b.id));
+
+  function trimPopulation() {
+    while (points.length > MAX_POINTS) {
+      const i = points.findIndex(p => p.free);
+      if (i < 0) break;
+      points.splice(i, 1);
+    }
+  }
+
+  function clearWorld() {
+    points = [];
+    sticks = [];
+    bodies = [];
+    held = null;
+    cutTrail.length = 0;
+  }
+
+  /* -------------------------------------------------------------- spawners */
+
+  function spawnBall(x, y, r, vx, vy) {
+    const p = addPoint(x, y, { r, color: nextColor(), free: true, vx: vx || 0, vy: vy || 0 });
+    trimPopulation();
+    return p;
+  }
+
+  function spawnRope(x1, y1, x2, y2, seg) {
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    const n = Math.max(2, Math.min(90, Math.round(dist / seg) + 1));
+    const col = nextColor();
+    const r = Math.max(2.5, seg * 0.42);
+    let prev = null;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const p = addPoint(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, {
+        r, mass: 1, mesh: true, pinned: i === 0, color: col,
+      });
+      if (prev) link(prev, p, { w: r * 1.7 });
+      prev = p;
+    }
+    trimPopulation();
+  }
+
+  function spawnCloth(cx, cy, seg) {
+    const cols = 16, rows = 12;
+    const x0 = cx - ((cols - 1) * seg) / 2, y0 = cy;
+    const col = nextColor();
+    const grid = [];
+    for (let j = 0; j < rows; j++) {
+      grid[j] = [];
+      for (let i = 0; i < cols; i++) {
+        grid[j][i] = addPoint(x0 + i * seg, y0 + j * seg, {
+          r: seg * 0.45,
+          mass: 1,
+          mesh: true,
+          pinned: j === 0 && i % 5 === 0,
+          color: col,
+        });
+      }
+    }
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        if (i > 0) link(grid[j][i - 1], grid[j][i], { w: 1, dim: true });
+        if (j > 0) link(grid[j - 1][i], grid[j][i], { w: 1, dim: true });
+      }
+    }
+    bodies.push({ type: 'cloth', grid, cols, rows, color: col });
+    trimPopulation();
+  }
+
+  function spawnBlob(cx, cy, radius) {
+    const n = 16;
+    const col = nextColor();
+    const ring = [];
+    const pad = Math.max(3, radius * 0.32);
+    const center = addPoint(cx, cy, { r: radius * 0.3, mass: 2, color: col, mesh: true, collide: false });
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      ring.push(addPoint(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius, {
+        r: pad, mass: 1, mesh: true, color: col,
+      }));
+    }
+    const skin = [];
+    for (let i = 0; i < n; i++) {
+      skin.push(link(ring[i], ring[(i + 1) % n], { w: pad * 2, color: col }));   // skin
+      link(ring[i], ring[(i + 2) % n], { stiff: 0.55, hide: true });  // brace
+      link(center, ring[i], { stiff: 0.35, hide: true });             // pressure
+    }
+    bodies.push({ type: 'blob', ring, center, skin, pad, color: col });
+    trimPopulation();
+  }
+
+  function demoScene() {
+    clearWorld();
+    spawnCloth(W * 0.28, H * 0.12, Math.max(9, Math.min(16, W / 50)));
+
+    // pendulum: rope with a heavy bob on the end
+    const ax = W * 0.62, ay = H * 0.1;
+    const n = 9, len = 22;
+    let prev = null;
+    const col = nextColor();
+    for (let i = 0; i < n; i++) {
+      const p = addPoint(ax + i * 6, ay + i * len, { r: 4, mass: 1, mesh: true, pinned: i === 0, color: col });
+      if (prev) link(prev, p, { w: 3 });
+      prev = p;
+    }
+    const bob = addPoint(prev.x + 40, prev.y + 30, { r: 22, mass: 8, color: col });
+    link(prev, bob, { w: 3 });
+
+    spawnBlob(W * 0.84, H * 0.35, Math.min(60, W * 0.06));
+    for (let i = 0; i < 14; i++) {
+      spawnBall(W * 0.5 + (Math.random() - 0.5) * W * 0.35, H * 0.06 + Math.random() * H * 0.2,
+                8 + Math.random() * 14);
+    }
+  }
+
+  /* --------------------------------------------------------------- physics */
+
+  const grid = new Map();
+
+  function buildGrid(cell) {
+    grid.clear();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      p.i = i;
+      if (!p.collide) continue;
+      const key = ((p.x / cell) | 0) * 100003 + ((p.y / cell) | 0);
+      let bucket = grid.get(key);
+      if (!bucket) grid.set(key, bucket = []);
+      bucket.push(p);
+    }
+  }
+
+  function solveCollisions() {
+    let maxR = 8;
+    for (const p of points) if (p.collide && p.r > maxR) maxR = p.r;
+    const cell = maxR * 2;
+    buildGrid(cell);
+
+    for (const p of points) {
+      if (!p.collide) continue;
+      const cx = (p.x / cell) | 0, cy = (p.y / cell) | 0;
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          const bucket = grid.get((cx + ox) * 100003 + (cy + oy));
+          if (!bucket) continue;
+          for (const q of bucket) {
+            if (q.i <= p.i) continue;                       // each pair once
+            if (p.links && p.links.has(q.id)) continue;     // ignore linked neighbours
+            resolvePair(p, q);
+          }
+        }
+      }
+    }
+  }
+
+  function resolvePair(a, b) {
+    const totalInv = a.inv + b.inv;
+    if (totalInv === 0) return;
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const minD = a.r + b.r;
+    let d2 = dx * dx + dy * dy;
+    if (d2 >= minD * minD) return;
+    let d = Math.sqrt(d2);
+    if (d < 1e-6) { dx = (Math.random() - 0.5) * 0.01; dy = 0.01; d = 0.01; }
+    const nx = dx / d, ny = dy / d;
+    const overlap = minD - d;
+
+    a.x -= nx * overlap * (a.inv / totalInv);
+    a.y -= ny * overlap * (a.inv / totalInv);
+    b.x += nx * overlap * (b.inv / totalInv);
+    b.y += ny * overlap * (b.inv / totalInv);
+
+    // restitution along the contact normal (verlet velocities live in px/py)
+    const avx = a.x - a.px, avy = a.y - a.py;
+    const bvx = b.x - b.px, bvy = b.y - b.py;
+    const rel = (bvx - avx) * nx + (bvy - avy) * ny;
+    if (rel < 0) {
+      const j = (-(1 + cfg.bounce) * rel) / totalInv;
+      a.px += j * a.inv * nx;
+      a.py += j * a.inv * ny;
+      b.px -= j * b.inv * nx;
+      b.py -= j * b.inv * ny;
+    }
+  }
+
+  function solveSticks() {
+    for (const s of sticks) {
+      const a = s.a, b = s.b;
+      const totalInv = a.inv + b.inv;
+      if (totalInv === 0) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 1e-6;
+      const diff = ((d - s.len) / d) * s.stiff;
+      const ka = (a.inv / totalInv) * diff;
+      const kb = (b.inv / totalInv) * diff;
+      a.x += dx * ka; a.y += dy * ka;
+      b.x -= dx * kb; b.y -= dy * kb;
+    }
+  }
+
+  function solveWalls() {
+    const e = cfg.bounce, f = 1 - cfg.wallFriction;
+    for (const p of points) {
+      if (p.inv === 0) continue;
+      const r = p.collide ? p.r : 1;
+      let vx = p.x - p.px, vy = p.y - p.py;
+      if (p.x < r)      { p.x = r;     p.px = p.x + vx * e; p.py = p.y - vy * f; }
+      else if (p.x > W - r) { p.x = W - r; p.px = p.x + vx * e; p.py = p.y - vy * f; }
+      vx = p.x - p.px; vy = p.y - p.py;
+      if (p.y < r)      { p.y = r;     p.py = p.y + vy * e; p.px = p.x - vx * f; }
+      else if (p.y > H - r) { p.y = H - r; p.py = p.y + vy * e; p.px = p.x - vx * f; }
+    }
+  }
+
+  function integrate(dt) {
+    const gy = cfg.gravity * dt * dt;
+    for (const p of points) {
+      if (p.inv === 0) { p.px = p.x; p.py = p.y; continue; }
+      const vx = (p.x - p.px) * AIR_DRAG;
+      const vy = (p.y - p.py) * AIR_DRAG;
+      p.px = p.x; p.py = p.y;
+      p.x += vx;
+      p.y += vy + gy;
+    }
+  }
+
+  function applyWell(dt) {
+    if (!well.on) return;
+    const strength = (well.repel ? -1 : 1) * 900000 * dt * dt;
+    for (const p of points) {
+      if (p.inv === 0) continue;
+      const dx = well.x - p.x, dy = well.y - p.y;
+      const d2 = Math.max(900, dx * dx + dy * dy);
+      const d = Math.sqrt(d2);
+      const a = strength / d2;
+      p.x += (dx / d) * a;
+      p.y += (dy / d) * a;
+    }
+  }
+
+  function simulate() {
+    const dt = (DT * cfg.speed) / SUBSTEPS;
+    for (let s = 0; s < SUBSTEPS; s++) {
+      integrate(dt);
+      applyWell(dt);
+      for (let k = 0; k < ITERATIONS; k++) solveSticks();
+      solveCollisions();
+      solveWalls();
+    }
+  }
+
+  /* ----------------------------------------------------------------- tools */
+
+  const TOOLS = [
+    { id: 'ball',  name: 'Ball',   key: '1', hint: 'drag to fling a ball · click to drop one' },
+    { id: 'rope',  name: 'Rope',   key: '2', hint: 'drag to string a rope, pinned where you started' },
+    { id: 'cloth', name: 'Cloth',  key: '3', hint: 'click to hang a sheet of cloth' },
+    { id: 'blob',  name: 'Blob',   key: '4', hint: 'click to drop a squishy soft body' },
+    { id: 'drag',  name: 'Drag',   key: '5', hint: 'grab anything and throw it' },
+    { id: 'cut',   name: 'Cut',    key: '6', hint: 'slash across ropes and cloth to sever them' },
+    { id: 'pin',   name: 'Pin',    key: '7', hint: 'click to nail a point in place · shift-click to release it' },
+    { id: 'well',  name: 'Well',   key: '8', hint: 'hold to pull everything in · shift to push it away' },
+  ];
+  let tool = 'ball';
+
+  const toolsEl = document.getElementById('tools');
+  TOOLS.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'tool';
+    b.dataset.tool = t.id;
+    b.innerHTML = t.name + '<span class="key">' + t.key + '</span>';
+    b.addEventListener('click', () => setTool(t.id));
+    toolsEl.appendChild(b);
+  });
+
+  function setTool(id) {
+    tool = id;
+    for (const b of toolsEl.children) b.classList.toggle('active', b.dataset.tool === id);
+    const t = TOOLS.find(x => x.id === id);
+    hintTool.textContent = t ? t.name.toLowerCase() + ' — ' + t.hint : '';
+  }
+  setTool('ball');
+
+  /* ----------------------------------------------------------------- input */
+
+  const pointer = { x: W / 2, y: H / 2, down: false, inside: false, vx: 0, vy: 0, lastT: 0 };
+  const well = { on: false, repel: false, x: 0, y: 0 };
+  const cutTrail = [];
+  let held = null;
+  let ropeStart = null;
+  let paused = false;
+
+  function localPos(ev) {
+    const r = cv.getBoundingClientRect();
+    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+  }
+
+  function nearestPoint(x, y, maxDist) {
+    let best = null, bestD = maxDist * maxDist;
+    for (const p of points) {
+      const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    return best;
+  }
+
+  function grab(x, y) {
+    const p = nearestPoint(x, y, 44);
+    if (!p) return;
+    held = p;
+    held.inv = 0;
+  }
+
+  function release() {
+    if (!held) return;
+    const dtSub = (DT * cfg.speed) / SUBSTEPS;
+    held.inv = held.baseInv;
+    held.px = held.x - pointer.vx * dtSub;
+    held.py = held.y - pointer.vy * dtSub;
+    held = null;
+  }
+
+  // segment/segment intersection, used by the cut tool
+  function segsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+    const d1x = bx - ax, d1y = by - ay, d2x = dx - cx, d2y = dy - cy;
+    const den = d1x * d2y - d1y * d2x;
+    if (Math.abs(den) < 1e-9) return false;
+    const t = ((cx - ax) * d2y - (cy - ay) * d2x) / den;
+    const u = ((cx - ax) * d1y - (cy - ay) * d1x) / den;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  }
+
+  function cutAlong(x1, y1, x2, y2) {
+    if (!sticks.length) return;
+    sticks = sticks.filter(s => {
+      if (!segsCross(x1, y1, x2, y2, s.a.x, s.a.y, s.b.x, s.b.y)) return true;
+      s.a.links.delete(s.b.id);   // so severed surfaces stop being drawn as whole
+      s.b.links.delete(s.a.id);
+      return false;
+    });
+  }
+
+  function togglePin(x, y, unpin) {
+    const p = nearestPoint(x, y, 40);
+    if (!p) return;
+    if (unpin) {
+      if (!p.pinned) return;
+      p.pinned = false;
+      p.baseInv = 1 / Math.max(0.25, (p.r * p.r) / 100);
+      p.inv = p.baseInv;
+    } else {
+      p.pinned = true;
+      p.baseInv = 0;
+      p.inv = 0;
+      p.px = p.x; p.py = p.y;
+    }
+  }
+
+  cv.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    cv.setPointerCapture(ev.pointerId);
+    const { x, y } = localPos(ev);
+    pointer.x = x; pointer.y = y; pointer.down = true; pointer.inside = true;
+    pointer.vx = pointer.vy = 0;
+    pointer.lastT = performance.now();
+    const repel = ev.shiftKey || ev.button === 2;
+
+    switch (tool) {
+      case 'ball':
+        held = spawnBall(x, y, cfg.size);
+        held.inv = 0;
+        break;
+      case 'rope':
+        ropeStart = { x, y };
+        break;
+      case 'cloth':
+        spawnCloth(x, y, Math.max(10, cfg.size));
+        break;
+      case 'blob':
+        spawnBlob(x, y, Math.max(18, cfg.size * 2.4));
+        break;
+      case 'drag':
+        grab(x, y);
+        break;
+      case 'cut':
+        cutTrail.length = 0;
+        cutTrail.push({ x, y });
+        break;
+      case 'pin':
+        togglePin(x, y, repel);
+        break;
+      case 'well':
+        well.on = true; well.repel = repel; well.x = x; well.y = y;
+        break;
+    }
+  });
+
+  cv.addEventListener('pointermove', ev => {
+    const { x, y } = localPos(ev);
+    const now = performance.now();
+    const dt = Math.max(1, now - pointer.lastT) / 1000;
+    pointer.vx = (x - pointer.x) / dt;
+    pointer.vy = (y - pointer.y) / dt;
+    pointer.lastT = now;
+    const prevX = pointer.x, prevY = pointer.y;
+    pointer.x = x; pointer.y = y; pointer.inside = true;
+
+    if (!pointer.down) return;
+    if (tool === 'cut') {
+      cutAlong(prevX, prevY, x, y);
+      cutTrail.push({ x, y });
+      if (cutTrail.length > 16) cutTrail.shift();
+    } else if (tool === 'well') {
+      well.x = x; well.y = y;
+    }
+  });
+
+  function endPointer(ev) {
+    if (!pointer.down) return;
+    pointer.down = false;
+    const { x, y } = localPos(ev);
+
+    if (tool === 'rope' && ropeStart) {
+      const d = Math.hypot(x - ropeStart.x, y - ropeStart.y);
+      if (d > 6) spawnRope(ropeStart.x, ropeStart.y, x, y, Math.max(8, cfg.size));
+      ropeStart = null;
+    }
+    release();
+    well.on = false;
+    cutTrail.length = 0;
+  }
+  cv.addEventListener('pointerup', endPointer);
+  cv.addEventListener('pointercancel', endPointer);
+  cv.addEventListener('pointerleave', () => { pointer.inside = false; });
+  cv.addEventListener('contextmenu', ev => ev.preventDefault());
+
+  window.addEventListener('keydown', ev => {
+    if (ev.target.tagName === 'INPUT') return;
+    const t = TOOLS.find(x => x.key === ev.key);
+    if (t) { setTool(t.id); return; }
+    if (ev.code === 'Space') { ev.preventDefault(); setPaused(!paused); }
+    else if (ev.key === 'c' || ev.key === 'C') clearWorld();
+    else if (ev.key === 'd' || ev.key === 'D') demoScene();
+  });
+
+  function setPaused(v) {
+    paused = v;
+    document.body.classList.toggle('is-paused', paused);
+    document.getElementById('btn-pause').textContent = paused ? 'Play' : 'Pause';
+  }
+
+  document.getElementById('btn-pause').addEventListener('click', () => setPaused(!paused));
+  document.getElementById('btn-clear').addEventListener('click', clearWorld);
+  document.getElementById('btn-demo').addEventListener('click', demoScene);
+
+  function bindSlider(id, key, fmt) {
+    const input = document.getElementById('s-' + id);
+    const out = document.getElementById('v-' + id);
+    const sync = () => {
+      cfg[key] = parseFloat(input.value);
+      out.textContent = fmt(cfg[key]);
+    };
+    input.addEventListener('input', sync);
+    sync();
+  }
+  bindSlider('grav', 'gravity', v => String(Math.round(v)));
+  bindSlider('bounce', 'bounce', v => v.toFixed(2).replace(/^0/, ''));
+  bindSlider('size', 'size', v => String(Math.round(v)));
+  bindSlider('speed', 'speed', v => v.toFixed(1));
+
+  /* ----------------------------------------------------------------- render */
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // backdrop
+    ctx.fillStyle = '#0a0b0e';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.028)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x < W; x += 40) { ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); }
+    for (let y = 0; y < H; y += 40) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+
+    // filled surfaces: cloth panels and blob skins
+    ctx.lineJoin = 'round';
+    for (const b of bodies) {
+      if (b.type === 'cloth') {
+        const g = b.grid;
+        ctx.beginPath();
+        for (let j = 0; j < b.rows - 1; j++) {
+          for (let i = 0; i < b.cols - 1; i++) {
+            const a = g[j][i], c = g[j][i + 1], d = g[j + 1][i + 1], e = g[j + 1][i];
+            // a panel survives only while its four edges do — cuts leave real holes
+            if (!linked(a, c) || !linked(c, d) || !linked(e, d) || !linked(a, e)) continue;
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(c.x, c.y);
+            ctx.lineTo(d.x, d.y);
+            ctx.lineTo(e.x, e.y);
+            ctx.closePath();
+          }
+        }
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = b.color;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (b.type === 'blob') {
+        const r = b.ring, n = r.length;
+        let whole = true;
+        for (let i = 0; i < n && whole; i++) whole = linked(r[i], r[(i + 1) % n]);
+        // while intact the skin is drawn as one smooth body; once popped its
+        // links take over so you can see the torn edges
+        for (const s of b.skin) s.hide = whole;
+        if (!whole) continue;
+        ctx.beginPath();
+        ctx.moveTo((r[n - 1].x + r[0].x) / 2, (r[n - 1].y + r[0].y) / 2);
+        for (let i = 0; i < n; i++) {
+          const cur = r[i], nxt = r[(i + 1) % n];
+          ctx.quadraticCurveTo(cur.x, cur.y, (cur.x + nxt.x) / 2, (cur.y + nxt.y) / 2);
+        }
+        ctx.closePath();
+        // stroking at the node diameter makes the drawn edge match what collides
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = b.pad * 2;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.fillStyle = b.color;
+        ctx.fill();
+        ctx.save();
+        ctx.clip();
+        ctx.beginPath();
+        ctx.arc(b.center.x - b.pad, b.center.y - b.pad * 1.4, b.pad * 1.6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // sticks, tinted by how far they are stretched
+    ctx.lineCap = 'round';
+    for (const s of sticks) {
+      if (s.hide) continue;
+      if (s.color) {
+        ctx.strokeStyle = s.color;
+      } else {
+        const d = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y);
+        const strain = Math.min(1, Math.abs(d - s.len) / Math.max(4, s.len));
+        ctx.strokeStyle = strain > 0.02
+          ? 'rgb(' + Math.round(120 + strain * 135) + ',' + Math.round(150 - strain * 110) + ',' + Math.round(170 - strain * 120) + ')'
+          : 'rgb(150,168,190)';
+      }
+      // opaque so thick round-capped segments don't show their overlaps
+      ctx.globalAlpha = s.dim ? 0.22 : 1;
+      ctx.lineWidth = s.w;
+      ctx.beginPath();
+      ctx.moveTo(s.a.x, s.a.y);
+      ctx.lineTo(s.b.x, s.b.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // free-standing points (balls); mesh nodes are already implied by their links
+    for (const p of points) {
+      if (p.mesh && !p.pinned) continue;
+      if (p.mesh && p.pinned) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(p.x - 3.5, p.y - 3.5, 7, 7);
+        continue;
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      // highlight
+      ctx.beginPath();
+      ctx.arc(p.x - p.r * 0.3, p.y - p.r * 0.32, p.r * 0.34, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fill();
+      if (p.pinned) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(p.x - 3.5, p.y - 3.5, 7, 7);
+      }
+    }
+
+    // cut trail
+    if (cutTrail.length > 1) {
+      ctx.strokeStyle = 'rgba(242,100,124,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cutTrail[0].x, cutTrail[0].y);
+      for (let i = 1; i < cutTrail.length; i++) ctx.lineTo(cutTrail[i].x, cutTrail[i].y);
+      ctx.stroke();
+    }
+
+    // gravity well
+    if (well.on) {
+      const t = performance.now() / 240;
+      for (let i = 0; i < 3; i++) {
+        const rr = ((t + i * 0.66) % 1) * 70;
+        ctx.beginPath();
+        ctx.arc(well.x, well.y, well.repel ? 70 - rr : rr, 0, Math.PI * 2);
+        ctx.strokeStyle = well.repel ? 'rgba(247,185,85,' + (0.5 - rr / 200) + ')'
+                                     : 'rgba(110,231,240,' + (0.5 - rr / 200) + ')';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    // tool preview
+    if (pointer.inside && !pointer.down) {
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1;
+      if (tool === 'ball') {
+        ctx.beginPath(); ctx.arc(pointer.x, pointer.y, cfg.size, 0, Math.PI * 2); ctx.stroke();
+      } else if (tool === 'blob') {
+        ctx.beginPath(); ctx.arc(pointer.x, pointer.y, Math.max(18, cfg.size * 2.4), 0, Math.PI * 2); ctx.stroke();
+      } else if (tool === 'cloth') {
+        const seg = Math.max(10, cfg.size);
+        ctx.strokeRect(pointer.x - (15 * seg) / 2, pointer.y, 15 * seg, 11 * seg);
+      }
+      ctx.setLineDash([]);
+    }
+
+    // in-progress rope
+    if (pointer.down && tool === 'rope' && ropeStart) {
+      ctx.strokeStyle = 'rgba(110,231,240,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ropeStart.x, ropeStart.y);
+      ctx.lineTo(pointer.x, pointer.y);
+      ctx.stroke();
+    }
+  }
+
+  /* ------------------------------------------------------------------ loop */
+
+  let frames = 0, fps = 0, fpsT = performance.now();
+
+  function frame() {
+    if (held) {
+      // a held point is teleported to the cursor; velocity is applied on release
+      held.x = pointer.x; held.y = pointer.y;
+      held.px = pointer.x; held.py = pointer.y;
+    }
+    if (!paused) simulate();
+    draw();
+
+    frames++;
+    const now = performance.now();
+    if (now - fpsT > 500) {
+      fps = Math.round((frames * 1000) / (now - fpsT));
+      frames = 0; fpsT = now;
+    }
+    hud.textContent = points.length + ' points · ' + sticks.length + ' links · ' + fps + ' fps';
+    requestAnimationFrame(frame);
+  }
+
+  demoScene();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
