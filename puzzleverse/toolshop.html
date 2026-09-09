@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Puzzleverse Productions · Custom Browser Tools</title>
+<meta name="description" content="Small single-file browser tools that fix one annoying step in your workflow. No install, no account, usually done in 48 hours.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&display=swap" rel="stylesheet">
+<style>
+  /* =====================================================================
+     DAY is the tape label: cream stock, black spine, printed ink.
+     NIGHT is the screen: the CRT from the rest of the site.
+     ===================================================================== */
+
+  :root, [data-theme="light"] {
+    --bg:        #f3ebd7;
+    --panel:     #e9dfc4;
+    --input-bg:  #fbf6e8;
+    --text:      #191621;
+    --dim:       #6b6353;
+    --hair:      #ccbd9b;
+    --accent:    #0d6e72;   /* readouts, buttons, links */
+    --hot:       #cf2360;   /* spine, bullets, bleed */
+    --bleed-c:   #2bd9e0;
+    --label-bg:  #191621;
+    --label-tx:  #efe3c2;
+    --glow:      transparent;
+    --scan:      rgba(0,0,0,.035);
+    --vig:       rgba(110,92,54,.20);
+    --noise-op:  .07;
+    --noise-blend: multiply;
+    --shadow:    0 2px 0 rgba(0,0,0,.28);
+    --panel-shadow: 0 6px 24px rgba(90,72,40,.15);
+    --body-face: "VT323", monospace;
+  }
+
+  [data-theme="dark"] {
+    --bg:        #0c0b10;
+    --panel:     #15131c;
+    --input-bg:  #0a0910;
+    --text:      #e8e6df;
+    --dim:       #8a8794;
+    --hair:      #2c2937;
+    --accent:    #5ee3e6;
+    --hot:       #ff3d7f;
+    --bleed-c:   #2bd9e0;
+    --label-bg:  #efe3c2;
+    --label-tx:  #16141c;
+    --glow:      rgba(94,227,230,.5);
+    --scan:      rgba(255,255,255,.026);
+    --vig:       rgba(0,0,0,.6);
+    --noise-op:  .04;
+    --noise-blend: normal;
+    --shadow:    0 2px 0 rgba(0,0,0,.55);
+    --panel-shadow: 0 0 40px rgba(0,0,0,.6);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body-face);
+    font-size: 21px;
+    line-height: 1.5;
+    position: relative;
+    transition: background .16s steps(2), color .16s steps(2);
+  }
+
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 40; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 52%, var(--vig) 100%);
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0; z-index: 41; pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--scan) 0px, var(--scan) 1px,
+      transparent 1px, transparent 3px);
+  }
+  #static {
+    position: fixed; inset: 0; z-index: 39; pointer-events: none;
+    width: 100%; height: 100%;
+    opacity: var(--noise-op);
+    mix-blend-mode: var(--noise-blend);
+  }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 26px; position: relative; z-index: 2; }
+  p { max-width: 90ch; color: var(--dim); }
+  p b { color: var(--text); font-weight: normal; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 3px dashed var(--text); outline-offset: 4px;
+  }
+
+  /* ---------- OSD chrome ---------- */
+  .osd {
+    position: fixed; top: 20px; z-index: 42;
+    font-size: clamp(15px, 2vw, 19px);
+    letter-spacing: .08em; color: var(--accent);
+    text-shadow: 0 0 8px var(--glow);
+    user-select: none;
+  }
+  .osd-left { left: 24px; pointer-events: none; }
+  .osd-left .tri { display: inline-block; animation: blink 1.6s steps(1) infinite; }
+  .osd-left .ct { color: var(--dim); text-shadow: none; margin-left: 14px; font-variant-numeric: tabular-nums; }
+  @keyframes blink { 0%,60% { opacity: 1; } 61%,100% { opacity: 0; } }
+
+  #display {
+    right: 24px;
+    font-family: var(--body-face);
+    font-size: clamp(15px, 2vw, 19px);
+    letter-spacing: .08em;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 3px 12px 1px;
+    cursor: pointer;
+    text-shadow: 0 0 8px var(--glow);
+  }
+  #display:hover { background: var(--accent); color: var(--bg); text-shadow: none; }
+
+  /* ---------- masthead ---------- */
+  .mast { padding: 76px 0 0; display: flex; justify-content: space-between; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .mast .mark { font-family: "Bungee", sans-serif; font-size: clamp(1rem,2.4vw,1.35rem); }
+  .mast .mark em { font-style: normal; color: var(--hot); }
+  .mast .who { color: var(--dim); letter-spacing: .1em; }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 44px 0 0; }
+  h1 {
+    font-family: "Bungee", sans-serif;
+    /* --longest is the width of the longest headline line, measured in em.
+       Sizing the type off the container width divided by that number means
+       the line always fits exactly and can never wrap. The script measures
+       the real number once the font loads; this value is just a safe start. */
+    --longest: 15.2;
+    font-size: min(3.6rem, calc((100vw - 60px) / var(--longest)));
+    line-height: 1.04;
+    margin-bottom: 24px;
+  }
+  h1 .l { position: relative; display: block; white-space: nowrap; }
+  h1 .l::before, h1 .l::after {
+    content: attr(data-t); position: absolute; inset: 0; opacity: 0;
+  }
+  h1 .l::before { color: var(--hot); }
+  h1 .l::after  { color: var(--bleed-c); }
+  .glitching .l::before { opacity: .75; animation: split-m .38s steps(2,end) 1; }
+  .glitching .l::after  { opacity: .75; animation: split-c .38s steps(2,end) 1; }
+  @keyframes split-m {
+    0%   { transform: translate(-6px,2px);  clip-path: inset(10% 0 55% 0); }
+    50%  { transform: translate(4px,-2px);  clip-path: inset(60% 0 5% 0); }
+    100% { transform: translate(0,0); clip-path: inset(0 0 0 0); opacity: 0; }
+  }
+  @keyframes split-c {
+    0%   { transform: translate(6px,-2px);  clip-path: inset(55% 0 10% 0); }
+    50%  { transform: translate(-4px,2px);  clip-path: inset(5% 0 60% 0); }
+    100% { transform: translate(0,0); clip-path: inset(0 0 0 0); opacity: 0; }
+  }
+  .lede { font-size: clamp(1.15rem,2.2vw,1.4rem); max-width: 90ch; margin-bottom: 38px; }
+
+  /* ---------- the deck panel (live tool) ---------- */
+  .vcr {
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    border-top: 3px solid var(--hot);
+    max-width: 780px;
+    box-shadow: var(--panel-shadow);
+  }
+  .vcr-bar {
+    display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 12px 18px; border-bottom: 1px solid var(--hair);
+    color: var(--dim); letter-spacing: .12em; font-size: 16px;
+  }
+  .vcr-bar .on { color: var(--accent); text-shadow: 0 0 8px var(--glow); }
+  .vcr-body { padding: 22px 18px 18px; }
+  .fps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fps button {
+    font-family: var(--body-face); font-size: 16px; letter-spacing: .06em;
+    background: transparent; color: var(--dim);
+    border: 1px solid var(--hair); padding: 3px 10px; cursor: pointer;
+  }
+  .fps button:hover { border-color: var(--accent); color: var(--text); }
+  .fps button[aria-pressed="true"] {
+    background: var(--accent); border-color: var(--accent); color: var(--bg);
+  }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .field label { display: block; color: var(--dim); letter-spacing: .16em; font-size: 16px; margin-bottom: 8px; }
+  .field input {
+    width: 100%; background: var(--input-bg); border: 1px solid var(--hair);
+    color: var(--accent); text-shadow: 0 0 10px var(--glow);
+    font-family: var(--body-face); font-size: clamp(1.6rem,4.6vw,2.3rem);
+    letter-spacing: .04em; padding: 8px 12px 4px;
+  }
+  .field input:hover { border-color: var(--accent); }
+  .readout {
+    margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--hair);
+    display: flex; gap: 30px; flex-wrap: wrap; color: var(--dim); letter-spacing: .1em; font-size: 17px;
+  }
+  .readout span { color: var(--text); }
+  .vcr-note { margin-top: 16px; }
+
+  /* ---------- tape label section headers ---------- */
+  section { margin-top: 78px; }
+  .label {
+    display: inline-block; background: var(--label-bg); color: var(--label-tx);
+    font-size: clamp(1.1rem,2.6vw,1.5rem); letter-spacing: .28em;
+    padding: 7px 24px 4px 26px; transform: rotate(-1.1deg);
+    border-left: 9px solid var(--hot);
+    box-shadow: var(--shadow); margin-bottom: 26px;
+  }
+
+  /* ---------- lists ---------- */
+  .asks { list-style: none; max-width: 90ch; margin-top: 22px; }
+  .asks li { padding: 10px 0 10px 30px; border-bottom: 1px solid var(--hair); color: var(--dim); position: relative; }
+  .asks li::before { content: "\25B8"; position: absolute; left: 6px; color: var(--hot); }
+  .asks li:first-child { border-top: 1px solid var(--hair); }
+
+  .built { display: grid; grid-template-columns: 1fr 1fr; gap: 0 46px; margin-top: 22px; }
+  .built div { padding: 11px 0; border-bottom: 1px solid var(--hair); }
+  .built h3 { font-size: 20px; font-weight: normal; letter-spacing: .06em; color: var(--text); }
+  .built p { font-size: 19px; max-width: none; line-height: 1.35; }
+
+  .steps { counter-reset: s; max-width: 90ch; margin-top: 22px; }
+  .steps > div { counter-increment: s; display: flex; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--hair); }
+  .steps > div::before {
+    content: counter(s, decimal-leading-zero);
+    color: var(--accent); text-shadow: 0 0 8px var(--glow);
+    flex: 0 0 auto; letter-spacing: .1em;
+  }
+  .steps h3 { font-size: 22px; font-weight: normal; letter-spacing: .04em; margin-bottom: 2px; }
+  .steps p { max-width: none; }
+
+  /* ---------- price as an OSD menu ---------- */
+  .ledger { max-width: 70ch; margin-top: 22px; border: 1px solid var(--hair); }
+  .ledger > div { padding: 18px 20px; border-bottom: 1px solid var(--hair); }
+  .ledger > div:last-child { border-bottom: 0; }
+  .ledger .row { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
+  .ledger h3 { font-size: 22px; font-weight: normal; letter-spacing: .08em; }
+  .ledger .amt { color: var(--accent); text-shadow: 0 0 8px var(--glow); white-space: nowrap; font-size: 22px; }
+  .ledger p { margin-top: 6px; max-width: none; }
+
+  /* ---------- contact ---------- */
+  .contact {
+    margin: 84px 0 40px; background: var(--panel);
+    border: 1px solid var(--hair); border-top: 3px solid var(--accent);
+    padding: 40px 30px;
+  }
+  .contact h2 { font-family: "Bungee", sans-serif; font-size: clamp(1.25rem,3vw,1.9rem); line-height: 1.18; max-width: 20ch; margin-bottom: 16px; }
+  .contact p { margin-bottom: 28px; }
+  .cta {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: clamp(1.15rem,2.4vw,1.45rem); letter-spacing: .08em;
+    color: var(--accent); text-decoration: none;
+    border: 2px solid var(--accent); padding: 11px 26px 8px;
+    text-shadow: 0 0 8px var(--glow);
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .cta:hover, .cta:focus-visible {
+    background: var(--accent); color: var(--bg);
+    text-shadow: none; box-shadow: 0 0 24px var(--glow);
+  }
+
+  footer { text-align: center; color: var(--dim); letter-spacing: .18em; padding: 0 0 60px; font-size: 17px; position: relative; z-index: 2; }
+
+  @media (max-width: 720px) {
+    .built { grid-template-columns: 1fr; }
+    .fields { grid-template-columns: 1fr; }
+    .osd-left .ct { display: none; }
+    .mast { padding-top: 68px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .osd-left .tri { animation: none; }
+    .glitching .l::before, .glitching .l::after { animation: none; opacity: 0; }
+    #static { display: none; }
+    body, * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!--<canvas id="static" aria-hidden="true"></canvas>-->
+<div class="osd osd-left"><span class="tri" aria-hidden="true">&#9654;</span> PLAY<span class="ct" id="ct">SP 0:00:00</span></div>
+<button class="osd" id="display" type="button">DISPLAY: DAY</button>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="mark">PUZZLEVERSE<em>&middot;</em>PRODUCTIONS</div>
+    <div class="who">TOMMY FILLIATER &middot; TOM VELLE &middot; CINCINNATI</div>
+  </header>
+
+  <section class="hero" style="margin-top:0">
+    <h1 id="head">
+      <span class="l" data-t="I build small">I build small</span>
+      <span class="l" data-t="browser tools that fix">browser tools that fix</span>
+      <span class="l" data-t="one annoying thing.">one annoying thing.</span>
+    </h1>
+    <p class="lede">One HTML file. It opens in your browser, runs offline, uploads nothing, and never asks anyone to make an account. <b>Most jobs are done in 48 hours.</b></p>
+
+    <div class="vcr">
+      <div class="vcr-bar">
+        <div>TIMECODE CONVERTER &nbsp;<span class="on">&#9654; LIVE</span></div>
+        <div class="fps" id="fps" role="group" aria-label="Frame rate"></div>
+      </div>
+      <div class="vcr-body">
+        <div class="fields">
+          <div class="field">
+            <label for="tc">TIMECODE</label>
+            <input id="tc" value="01:12:33:14" spellcheck="false" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="fr">FRAMES</label>
+            <input id="fr" value="0" spellcheck="false" inputmode="numeric">
+          </div>
+        </div>
+        <div class="readout">
+          <div>DURATION <span id="dur">0.000s</span></div>
+          <div>TIMEBASE <span id="tb">24</span></div>
+          <div>NON-DROP</div>
+        </div>
+      </div>
+    </div>
+    <p class="vcr-note">That is the whole pitch. Type in it. Change the frame rate. It is one file with nothing behind it, and yours would be too.</p>
+  </section>
+
+  <section>
+    <div class="label">WHAT PEOPLE ASK FOR</div>
+    <p>Usually it is a step someone repeats forty times a week by hand. Something you Google 100 times and never remember to save. Not a product, not a platform. One screen that does one job and then gets out of the way. </p>
+    <ul class="asks">
+      <li>Batch-rename or reorganize a folder of exports to a naming convention</li>
+      <li>Search a pile of subtitle or transcript files for a phrase and get timestamps back</li>
+      <li>Generate an overlay, lower third, or title card and export a transparent PNG</li>
+      <li>Turn a spreadsheet the team keeps in Excel into a clean page anyone can read</li>
+      <li>Log and tag footage while you watch it, saved straight to disk</li>
+      <li>Preview how artwork sits on a curved surface or a mockup before you commit</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="label">ALREADY BUILT</div>
+    <p>These were made for my own production work. Every one is a single file that opens in a browser.</p>
+    <div class="built" id="built"></div>
+  </section>
+
+  <section>
+    <div class="label">HOW IT WORKS</div>
+    <div class="steps">
+      <div><div>
+        <h3>You describe the annoying part</h3>
+        <p>A paragraph is enough. A screen recording is even better. I tell you within a day whether it is a good fit and what it costs.</p>
+      </div></div>
+      <div><div>
+        <h3>I send a working version in about 48 hours</h3>
+        <p>Not a mockup or a proposal. The actual tool, running, with your real data in it if you can share some.</p>
+      </div></div>
+      <div><div>
+        <h3>Two rounds of changes, then it is yours</h3>
+        <p>You get the file. Keep it, copy it, put it on your server, hand it to the whole team. No license, no seat count, nothing to renew.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">WHAT IT COSTS</div>
+    <div class="ledger">
+      <div>
+        <div class="row"><h3>ONE JOB, ONE SCREEN</h3><div class="amt">$450</div></div>
+        <p>A converter, a generator, a calculator, a search box over files you already have. Turnaround of 48 hours.</p>
+      </div>
+      <div>
+        <div class="row"><h3>A REAL WORKFLOW TOOL</h3><div class="amt">$900 to $1,500</div></div>
+        <p>Several linked steps, file import and export, saved presets, your branding on it. Usually about a week.</p>
+      </div>
+      <div>
+        <div class="row"><h3>STANDING ARRANGEMENT</h3><div class="amt">LET'S TALK</div></div>
+        <p>For teams that keep finding these. A monthly block of hours, small tools shipped as they come up.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact">
+    <h2>Tell me the step you are sick of doing by hand.</h2>
+    <p>If I cannot build it, I will say so the same day and you will have lost one email.</p>
+    <a class="cta" id="mailto" href="mailto:messagetomvelle@gmail.com"><span aria-hidden="true">&#9654;</span> EMAIL ME THE PROBLEM</a>
+  </section>
+
+</div>
+
+<footer>PUZZLEVERSE PRODUCTIONS &middot; EST. 2004</footer>
+
+<script>
+/* =======================================================================
+   EDIT THESE TWO THINGS AND THE PAGE IS DONE.
+   ======================================================================= */
+
+const CONTACT_EMAIL = "messagetomvelle@gmail.com";
+
+const TOOLS = [
+  ["TileForge",    "Generates seamless repeating patterns and exports them tiled."],
+  ["WarpForge",    "Warps flat artwork onto hats and shirts so it looks printed on."],
+  ["SandForge",    "Carves typed text into sand and exports it with a clear background."],
+  ["FrameForge",   "Puts a photo in a picture frame you can spin in 3D, then exports it."],
+  ["RoomForge",    "Builds a room set you can walk around and screenshot from any angle."],
+  ["FluidForge",   "Pixel fluid simulator that fills and levels enclosed spaces."],
+  ["AtlasForge",   "Plots names onto a world map or a US state map."],
+  ["MapForge",     "Generates a game-style minimap that stays in sync with footage."],
+  ["CreditForge",  "Saves found images with the credit and source URL tracked in one file."],
+  ["TitleForge",   "Animated 3D extruded titles in the style of a broadcast open."],
+  ["MatteForge",   "Turns a 3D silhouette into a matte for compositing."],
+  ["ResumeForge",  "Builds a resume from a checkbox library and exports a Word file."],
+  ["ShelfForge",   "Edits the contents of a website section without touching the code."],
+  ["Splitsville",  "Splits subtitle files word by word for caption animation."],
+  ["Nocturne",     "Turns type into animated constellations for video use."],
+  ["Transcript search", "Fuzzy phrase search across hundreds of transcripts, bad spelling included."],
+  ["Subtitle search",   "Searches a folder of subtitle files and returns episode and timestamp."],
+  ["Clip catalog",      "Logs and tags moments while you watch, saving straight to disk."],
+  ["Crawl generator",   "Recreates a scrolling opening crawl with your own text."],
+  ["VHS box viewer",    "Displays cover art on a 3D tape case you can rotate."],
+  ["Fractal generator", "Renders and exports fractal artwork at print size."],
+  ["Morse beacon",      "Encodes a message as light and sound for on-screen use."]
+];
+
+/* ======================================================================= */
+
+document.getElementById("built").innerHTML = TOOLS.map(function (t) {
+  return "<div><h3>" + t[0] + "</h3><p>" + t[1] + "</p></div>";
+}).join("");
+
+var mail = document.getElementById("mailto");
+mail.href = "mailto:" + CONTACT_EMAIL + "?subject=" + encodeURIComponent("Tool idea");
+mail.setAttribute("aria-label", "Email " + CONTACT_EMAIL);
+
+var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var head = document.getElementById("head");
+
+/* Measures the widest headline line in em and hands it to the CSS above,
+   so the type is always as big as it can be without wrapping. Runs once. */
+function fitHeadline() {
+  var probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;" +
+                        "font:100px 'Bungee',sans-serif;";
+  document.body.appendChild(probe);
+  var widest = 0;
+  Array.prototype.forEach.call(head.querySelectorAll(".l"), function (l) {
+    probe.textContent = l.textContent.trim();
+    widest = Math.max(widest, probe.getBoundingClientRect().width / 100);
+  });
+  probe.parentNode.removeChild(probe);
+  if (widest > 0) head.style.setProperty("--longest", widest.toFixed(2));
+}
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(fitHeadline);
+} else {
+  window.addEventListener("load", fitHeadline);
+}
+
+function glitch(once) {
+  if (!reduced) {
+    head.classList.add("glitching");
+    setTimeout(function () { head.classList.remove("glitching"); }, 400);
+  }
+  if (!once) setTimeout(glitch, 3200 + Math.random() * 5200);
+}
+setTimeout(function () { glitch(false); }, 1600);
+
+/* ---------- day / night display ---------- */
+var root = document.documentElement;
+var btn = document.getElementById("display");
+
+function setTheme(name) {
+  root.setAttribute("data-theme", name);
+  btn.textContent = "DISPLAY: " + (name === "dark" ? "NIGHT" : "DAY");
+  btn.setAttribute("aria-label", "Switch to " + (name === "dark" ? "day" : "night") + " display");
+  try { localStorage.setItem("pv-display", name); } catch (e) {}
+}
+
+try {
+  var saved = localStorage.getItem("pv-display");
+  if (saved === "dark" || saved === "light") setTheme(saved);
+} catch (e) {}
+
+btn.addEventListener("click", function () {
+  setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  glitch(true);
+});
+
+/* ---------- timecode converter ---------- */
+var RATES = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60];
+var fps = 24;
+var tcEl = document.getElementById("tc");
+var frEl = document.getElementById("fr");
+var durEl = document.getElementById("dur");
+var tbEl = document.getElementById("tb");
+var fpsEl = document.getElementById("fps");
+
+function base() { return Math.round(fps); }
+function pad(n) { return String(n).padStart(2, "0"); }
+
+function parseTC(str) {
+  var parts = String(str).split(/[^0-9]+/).filter(function (p) { return p !== ""; });
+  while (parts.length < 4) parts.unshift("0");
+  parts = parts.slice(-4).map(Number);
+  var tb = base();
+  return ((parts[0] * 3600 + parts[1] * 60 + parts[2]) * tb) + parts[3];
+}
+
+function formatTC(f) {
+  var tb = base();
+  if (!isFinite(f) || f < 0) f = 0;
+  f = Math.round(f);
+  var frames = f % tb;
+  var total = Math.floor(f / tb);
+  return pad(Math.floor(total / 3600)) + ":" + pad(Math.floor(total / 60) % 60) +
+         ":" + pad(total % 60) + ":" + pad(frames);
+}
+
+function showDuration(f) {
+  durEl.textContent = (f / fps).toFixed(3) + "s";
+  tbEl.textContent = base();
+}
+
+function fromTC() {
+  var f = parseTC(tcEl.value);
+  frEl.value = f;
+  showDuration(f);
+}
+
+function fromFrames() {
+  var f = parseInt(String(frEl.value).replace(/[^0-9]/g, ""), 10);
+  if (!isFinite(f)) f = 0;
+  tcEl.value = formatTC(f);
+  showDuration(f);
+}
+
+tcEl.addEventListener("input", fromTC);
+frEl.addEventListener("input", fromFrames);
+tcEl.addEventListener("blur", function () { tcEl.value = formatTC(parseTC(tcEl.value)); });
+
+fpsEl.innerHTML = RATES.map(function (r) {
+  return '<button type="button" data-r="' + r + '" aria-pressed="' + (r === fps) + '">' + r + "</button>";
+}).join("");
+
+fpsEl.addEventListener("click", function (e) {
+  var b = e.target.closest("button");
+  if (!b) return;
+  var frames = parseInt(frEl.value, 10) || 0;
+  fps = parseFloat(b.dataset.r);
+  Array.prototype.forEach.call(fpsEl.children, function (c) {
+    c.setAttribute("aria-pressed", String(parseFloat(c.dataset.r) === fps));
+  });
+  tcEl.value = formatTC(frames);
+  showDuration(frames);
+});
+
+fromTC();
+
+/* ---------- tape counter ---------- */
+var ct = document.getElementById("ct");
+var start = Date.now();
+function tick() {
+  var s = Math.floor((Date.now() - start) / 1000);
+  ct.textContent = "SP " + Math.floor(s / 3600) + ":" +
+    pad(Math.floor((s % 3600) / 60)) + ":" + pad(s % 60);
+}
+tick();
+setInterval(tick, 1000);
+
+/* ---------- grain ---------- */
+var canvas = document.getElementById("static");
+var ctx = canvas.getContext("2d");
+function resize() {
+  canvas.width = Math.floor(window.innerWidth / 3);
+  canvas.height = Math.floor(window.innerHeight / 3);
+}
+window.addEventListener("resize", resize);
+resize();
+function noise() {
+  if (reduced) return;
+  var img = ctx.createImageData(canvas.width, canvas.height);
+  var d = img.data;
+  for (var i = 0; i < d.length; i += 4) {
+    var v = (Math.random() * 255) | 0;
+    d[i] = d[i + 1] = d[i + 2] = v;
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  requestAnimationFrame(function () { setTimeout(noise, 110); });
+}
+noise();
+</script>
+
+</body>
+</html>
