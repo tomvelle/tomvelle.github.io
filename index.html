@@ -1,174 +1,1144 @@
-<!DOCTYPE HTML>
-
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<title>tom velle | portfolio site landing</title>
-	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-	<link rel="stylesheet" href="assets/css/main.css" />
-	<noscript>
-		<link rel="stylesheet" href="assets/css/noscript.css" />
-	</noscript>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tom Velle (Tommy Filliater) · Video Editor, Front-End Developer, Tool Builder</title>
+<meta name="description" content="Tom Velle is Tommy Filliater: a video editor, front-end developer, and tool builder in Cincinnati. See the work, grab the resume, get in touch.">
+<link rel="canonical" href="https://tomvelle.com/">
+<meta name="theme-color" content="#0c0b10">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tomvelle.com/">
+<meta property="og:title" content="Tom Velle (Tommy Filliater)">
+<meta property="og:description" content="Video editing, front-end dev, and homemade tools. Based in Cincinnati.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&amp;family=VT323&amp;display=swap" rel="stylesheet">
+
+<!-- Tells search engines that Tom Velle and Tommy Filliater are the same person. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Tommy Filliater",
+  "alternateName": "Tom Velle",
+  "url": "https://tomvelle.com/",
+  "jobTitle": "Video Editor and Front-End Developer",
+  "address": { "@type": "PostalAddress", "addressLocality": "Cincinnati", "addressRegion": "OH", "addressCountry": "US" },
+  "sameAs": [
+    "https://www.linkedin.com/in/tommyfilliater/",
+    "https://www.youtube.com/@tomvelle",
+    "https://github.com/tomvelle",
+    "https://x.com/tomvelle",
+    "https://www.instagram.com/tom.velle",
+    "https://www.facebook.com/realtomvelle",
+    "https://puzzleverse.productions/"
+  ]
+}
+</script>
+
+<style>
+  /* Same tape stock as puzzleverse.productions. Puzzleverse is the tape
+     collection (PLAY). This page is the camcorder pointed at the guy who
+     makes them (REC), so the corners and the hero frame are the only
+     things that differ. */
+  :root {
+    --tape-black: #0c0b10;
+    --panel: #14121a;
+    --phosphor: #e8e6df;
+    --osd-cyan: #5ee3e6;
+    --bleed-magenta: #ff3d7f;
+    --bleed-cyan: #2bd9e0;
+    --label-cream: #efe3c2;
+    --label-amber: #f5b942;
+    --dim: #8a8794;
+    --shelf-wood: #1a1620;
+
+    /* printed on label stock */
+    --ink: #16141c;
+    --ink-dim: #5f5848;
+    --ink-rule: #cdbf9c;
+    --ink-teal: #0d6e72;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--tape-black);
+    color: var(--phosphor);
+    font-family: "VT323", monospace;
+    position: relative;
+  }
+
+  /* faint CRT vignette */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  /* scanlines */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,.028) 0px,
+      rgba(255,255,255,.028) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  #static {
+    position: fixed;
+    inset: 0;
+    opacity: .05;
+    pointer-events: none;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ---- OSD corners (fixed, like a camcorder viewfinder) ---- */
+  .osd {
+    position: fixed;
+    font-size: clamp(16px, 2.4vw, 24px);
+    letter-spacing: .08em;
+    color: var(--osd-cyan);
+    text-shadow: 0 0 8px rgba(94,227,230,.55);
+    z-index: 6;
+    user-select: none;
+    pointer-events: none;
+  }
+  .osd-rec { top: 18px; left: 22px; color: var(--phosphor); text-shadow: none; }
+  .osd-rec .dot {
+    display: inline-block;
+    color: var(--bleed-magenta);
+    text-shadow: 0 0 10px rgba(255,61,127,.7);
+    animation: blink 1.6s steps(1) infinite;
+  }
+  .osd-counter { top: 18px; right: 22px; font-variant-numeric: tabular-nums; }
+  .osd-channel, .osd-date {
+    bottom: 16px;
+    text-shadow: none;
+    background: rgba(12,11,16,.8);
+    padding: 2px 9px 0;
+  }
+  .osd-channel { left: 13px; color: var(--dim); }
+  .osd-date { right: 13px; color: var(--label-amber); font-variant-numeric: tabular-nums; }
+
+  @keyframes blink { 0%, 60% { opacity: 1; } 61%, 100% { opacity: 0; } }
+
+  /* ---- nav ---- */
+  nav {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 7;
+    display: flex;
+    gap: 4px;
+    background: rgba(12,11,16,.82);
+    border: 1px solid rgba(138,135,148,.35);
+    padding: 6px 10px;
+    backdrop-filter: blur(3px);
+    white-space: nowrap;
+  }
+  nav a {
+    color: var(--dim);
+    text-decoration: none;
+    font-size: clamp(15px, 2vw, 19px);
+    letter-spacing: .1em;
+    padding: 3px 12px;
+    transition: color .15s ease, background .15s ease;
+  }
+  nav a:hover, nav a:focus-visible { color: var(--tape-black); background: var(--osd-cyan); }
+  nav a.active { color: var(--osd-cyan); }
+  nav a.active:hover, nav a.active:focus-visible { color: var(--tape-black); }
+  nav a:focus-visible { outline: 2px dashed var(--phosphor); outline-offset: 2px; }
+
+  /* ---- shared channel shell ---- */
+  .chan {
+    position: relative;
+    z-index: 2;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 110px 28px 40px;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    margin-bottom: 34px;
+  }
+  .section-head .ch {
+    color: var(--osd-cyan);
+    font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+    letter-spacing: .14em;
+    text-shadow: 0 0 8px rgba(94,227,230,.4);
+    white-space: nowrap;
+  }
+  .section-head h2 {
+    font-family: "Bungee", sans-serif;
+    font-size: clamp(1.4rem, 4.2vw, 2.4rem);
+    letter-spacing: .02em;
+    line-height: 1;
+  }
+  .section-head .rule {
+    flex: 1;
+    height: 2px;
+    background: repeating-linear-gradient(to right, var(--dim) 0 8px, transparent 8px 16px);
+    opacity: .35;
+    align-self: center;
+  }
+
+  /* ---- CH 00: hero ---- */
+  #hero {
+    min-height: 100vh;
+    min-height: 100svh;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 26px;
+    padding: 100px 24px 120px;
+  }
+
+  /* viewfinder corner brackets */
+  .vf {
+    position: absolute;
+    inset: 78px clamp(16px, 6vw, 96px) 100px;
+    pointer-events: none;
+  }
+  .vf i {
+    position: absolute;
+    width: clamp(22px, 4vw, 40px);
+    height: clamp(22px, 4vw, 40px);
+    border: 2px solid rgba(232,230,223,.5);
+  }
+  .vf i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+  .vf i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+  .vf i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+  .vf i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+
+  .wordmark {
+    font-family: "Bungee", sans-serif;
+    font-size: clamp(2.5rem, 11.5vw, 7.6rem);
+    line-height: .95;
+    color: var(--phosphor);
+    letter-spacing: .01em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(12px, 2.2vw, 22px);
+  }
+  .wordmark .main-line { position: relative; display: block; white-space: nowrap; }
+
+  /* RGB-split ghosts */
+  .wordmark .main-line::before,
+  .wordmark .main-line::after {
+    content: attr(data-t);
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+  }
+  .wordmark .main-line::before { color: var(--bleed-magenta); }
+  .wordmark .main-line::after { color: var(--bleed-cyan); }
+
+  .glitching .main-line::before {
+    opacity: .8;
+    animation: split-m .38s steps(2, end) 1;
+  }
+  .glitching .main-line::after {
+    opacity: .8;
+    animation: split-c .38s steps(2, end) 1;
+  }
+  @keyframes split-m {
+    0% { transform: translate(-6px, 2px); clip-path: inset(10% 0 55% 0); }
+    50% { transform: translate(4px, -2px); clip-path: inset(60% 0 5% 0); }
+    100% { transform: translate(0, 0); clip-path: inset(0 0 0 0); opacity: 0; }
+  }
+  @keyframes split-c {
+    0% { transform: translate(6px, -2px); clip-path: inset(55% 0 10% 0); }
+    50% { transform: translate(-4px, 2px); clip-path: inset(5% 0 60% 0); }
+    100% { transform: translate(0, 0); clip-path: inset(0 0 0 0); opacity: 0; }
+  }
+
+  /* the tape label under the name: this is the resume name */
+  .aka {
+    display: inline-block;
+    font-family: "VT323", monospace;
+    font-weight: normal;
+    font-size: clamp(1.25rem, 3.6vw, 2.1rem);
+    line-height: 1.1;
+    letter-spacing: .16em;
+    background: var(--label-cream);
+    color: var(--ink);
+    padding: 9px 22px 6px 20px;
+    transform: rotate(-1.3deg);
+    border-left: 10px solid var(--bleed-magenta);
+    box-shadow: 0 2px 0 rgba(0,0,0,.5);
+    white-space: nowrap;
+  }
+  .aka small { font-size: .72em; color: var(--ink-dim); letter-spacing: .2em; margin-right: .35em; }
+
+  .hero-line {
+    font-size: clamp(1.2rem, 2.8vw, 1.7rem);
+    color: var(--dim);
+    line-height: 1.35;
+  }
+  .hero-line b { color: var(--phosphor); font-weight: normal; }
+  .nb { white-space: nowrap; }
+
+  .cta-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+  .cta {
+    font-family: "VT323", monospace;
+    font-size: clamp(1.2rem, 2.6vw, 1.5rem);
+    letter-spacing: .06em;
+    color: var(--osd-cyan);
+    text-decoration: none;
+    border: 2px solid var(--osd-cyan);
+    padding: 10px 26px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+    text-shadow: 0 0 8px rgba(94,227,230,.4);
+    cursor: pointer;
+    background: transparent;
+  }
+  .cta:hover, .cta:focus-visible {
+    background: var(--osd-cyan);
+    color: var(--tape-black);
+    text-shadow: none;
+    box-shadow: 0 0 24px rgba(94,227,230,.35);
+  }
+  .cta:focus-visible { outline: 3px dashed var(--phosphor); outline-offset: 4px; }
+  .cta.ghost { color: var(--dim); border-color: var(--dim); text-shadow: none; }
+  .cta.ghost:hover, .cta.ghost:focus-visible { background: var(--dim); color: var(--tape-black); box-shadow: none; }
+  .cta .tri { font-size: .8em; }
+  .cta.small {
+    font-size: clamp(1rem, 2vw, 1.15rem);
+    padding: 6px 16px;
+    gap: 8px;
+  }
+  /* a button printed on label stock */
+  .cta.ink { color: var(--ink); border-color: var(--ink); text-shadow: none; white-space: nowrap; }
+  .cta.ink:hover, .cta.ink:focus-visible { background: var(--ink); color: var(--label-cream); box-shadow: none; }
+  .cta.ink:focus-visible { outline-color: var(--ink); }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--dim);
+    font-size: 1.1rem;
+    letter-spacing: .2em;
+    white-space: nowrap;
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 8px); } }
+
+  /* lane colors: one stripe color per kind of work, used on lanes and tapes */
+  .is-video { --stripe: var(--bleed-magenta); }
+  .is-web   { --stripe: var(--bleed-cyan); }
+  .is-tool  { --stripe: var(--label-amber); }
+
+  /* ---- CH 01: what I do (the label that says what is on the tape) ---- */
+  .label-card {
+    background: var(--label-cream);
+    color: var(--ink);
+    box-shadow: 0 0 0 6px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.5);
+  }
+  .lc-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 22px 8px 20px;
+    border-left: 14px solid var(--ink);
+    color: var(--ink-dim);
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    letter-spacing: .22em;
+  }
+  .lc-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 200px) 1fr auto;
+    gap: 8px 28px;
+    align-items: center;
+    padding: 22px 22px 20px 20px;
+    border-left: 14px solid var(--stripe, var(--bleed-magenta));
+    border-top: 2px solid var(--ink-rule);
+  }
+  .lc-lane h3 {
+    font-family: "Bungee", sans-serif;
+    font-weight: normal;
+    font-size: clamp(1.45rem, 3.4vw, 2rem);
+    line-height: 1;
+  }
+  .lc-run {
+    display: block;
+    margin-top: 6px;
+    color: var(--ink-teal);
+    letter-spacing: .16em;
+    font-size: clamp(1rem, 2vw, 1.2rem);
+  }
+  .lc-what p { font-size: clamp(1.2rem, 2.3vw, 1.42rem); line-height: 1.28; }
+  .lc-what .lc-with { color: var(--ink-dim); font-size: clamp(1.05rem, 2vw, 1.22rem); margin-top: 5px; }
+
+  /* ---- CH 02: the work ---- */
+  .group { font-weight: normal; margin: 52px 0 20px; }
+  .group.first { margin-top: 0; }
+  .group span {
+    display: inline-block;
+    background: var(--label-cream);
+    color: var(--ink);
+    font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+    letter-spacing: .24em;
+    padding: 6px 20px 3px 18px;
+    transform: rotate(-.9deg);
+    border-left: 9px solid var(--bleed-cyan);
+    box-shadow: 0 2px 0 rgba(0,0,0,.5);
+  }
+  .group-note {
+    color: var(--dim);
+    font-size: clamp(1.1rem, 2.2vw, 1.3rem);
+    margin: -6px 0 16px;
+  }
+  /* the tool shelf hides itself until it holds a tape */
+  .tool-group:not(:has(.tape)) { display: none; }
+
+  /* TV on the left, a short shelf of tapes on the right */
+  .screen-grid {
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 30px;
+    align-items: start;
+  }
+  .tv-frame {
+    background: var(--panel);
+    border: 2px solid rgba(138,135,148,.35);
+    padding: 16px;
+    box-shadow: 0 0 0 6px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.5);
+  }
+  .tv-screen {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background:
+      radial-gradient(ellipse at center, rgba(94,227,230,.08), transparent 70%),
+      #060509;
+    overflow: hidden;
+  }
+  .tv-screen iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  /* sits behind the player: shows while it loads, or if a blocker eats it */
+  .tv-standby {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    padding: 20px;
+    color: var(--dim);
+    font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+    letter-spacing: .14em;
+  }
+  .tv-standby a { color: var(--osd-cyan); text-decoration: none; text-shadow: 0 0 8px rgba(94,227,230,.5); }
+  .tv-standby a:hover, .tv-standby a:focus-visible { color: var(--phosphor); }
+  .tv-caption {
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: var(--dim);
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    letter-spacing: .1em;
+  }
+  .tv-caption b { color: var(--phosphor); font-weight: normal; }
+  .tv-caption a { color: var(--osd-cyan); text-decoration: none; }
+  .tv-caption a:hover, .tv-caption a:focus-visible { color: var(--phosphor); }
+  .tv-caption a:focus-visible { outline: 2px dashed var(--osd-cyan); outline-offset: 3px; }
+
+  .shelf {
+    background: linear-gradient(to bottom, transparent, rgba(0,0,0,.25));
+    border-bottom: 10px solid var(--shelf-wood);
+    box-shadow: 0 12px 0 -6px #000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 8px 14px;
+  }
+
+  /* a tape spine that is a link */
+  .tape {
+    display: grid;
+    grid-template-columns: 14px 1fr auto auto;
+    align-items: stretch;
+    color: inherit;
+    text-decoration: none;
+    background: linear-gradient(to bottom, #232030, #17141f 55%, #232030);
+    border: 1px solid rgba(0,0,0,.7);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    min-height: 58px;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .tape:hover, .tape:focus-visible {
+    transform: translateX(14px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), -10px 0 22px rgba(0,0,0,.55);
+  }
+  .tape:focus-visible { outline: 2px dashed var(--osd-cyan); outline-offset: 3px; }
+  .tape .stripe { background: var(--stripe, var(--bleed-magenta)); }
+  .tape .face {
+    display: flex;
+    align-items: center;
+    gap: 6px 16px;
+    padding: 8px 14px;
+    min-width: 0;
+  }
+  .tape .sticker {
+    flex: 0 0 auto;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: var(--label-cream);
+    color: var(--ink);
+    font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+    letter-spacing: .08em;
+    padding: 3px 12px 1px;
+    transform: rotate(-.6deg);
+    white-space: nowrap;
+  }
+  .tape .desc {
+    color: var(--dim);
+    font-size: clamp(1rem, 2vw, 1.18rem);
+    letter-spacing: .04em;
+    line-height: 1.2;
+    min-width: 0;
+  }
+  .tape .runtime {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    color: var(--dim);
+    font-size: clamp(.9rem, 1.8vw, 1.1rem);
+    letter-spacing: .12em;
+    border-left: 1px dashed rgba(138,135,148,.3);
+    white-space: nowrap;
+  }
+  .tape .caret {
+    display: flex;
+    align-items: center;
+    padding: 0 16px 0 2px;
+    color: var(--osd-cyan);
+    font-size: .95rem;
+  }
+
+  /* stacked tapes: label on top, description under it (narrow columns and phones) */
+  .shelf.stacked .tape { grid-template-columns: 14px 1fr auto; }
+  .shelf.stacked .tape .face { flex-direction: column; align-items: flex-start; padding: 12px 14px 11px; }
+  .shelf.stacked .tape .runtime { display: none; }
+
+  /* ---- CH 03: resume ---- */
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 36px;
+    align-items: start;
+  }
+  .about-copy p {
+    font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+    line-height: 1.5;
+    color: var(--dim);
+    margin-bottom: 18px;
+  }
+  .about-copy b { color: var(--phosphor); font-weight: normal; }
+  .about-copy .cta-row { justify-content: flex-start; margin: 26px 0 22px; }
+  .about-copy a:not(.cta) { color: var(--osd-cyan); text-decoration: underline; text-underline-offset: 3px; }
+  .about-copy a:not(.cta):hover, .about-copy a:not(.cta):focus-visible { color: var(--phosphor); }
+  .about-copy a:not(.cta):focus-visible { outline: 2px dashed var(--osd-cyan); outline-offset: 3px; }
+  .about-label {
+    background: var(--label-cream);
+    color: var(--ink);
+    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+    letter-spacing: .2em;
+    padding: 10px 22px 8px;
+    transform: rotate(1.1deg);
+    border-left: 10px solid var(--bleed-cyan);
+    box-shadow: 0 2px 0 rgba(0,0,0,.5);
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+  .spec-sheet {
+    border: 1px dashed rgba(138,135,148,.4);
+    padding: 18px 20px;
+    font-size: clamp(1rem, 2vw, 1.2rem);
+  }
+  .spec-sheet dt { color: var(--osd-cyan); letter-spacing: .14em; margin-top: 12px; }
+  .spec-sheet dt:first-child { margin-top: 0; }
+  .spec-sheet dd { color: var(--dim); margin-left: 0; }
+  .spec-sheet dd.loud { color: var(--phosphor); }
+
+  /* ---- CH 04: contact ---- */
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 36px;
+    align-items: start;
+  }
+  .contact-copy p {
+    font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+    line-height: 1.5;
+    color: var(--dim);
+    margin-bottom: 22px;
+  }
+  .contact-copy b { color: var(--phosphor); font-weight: normal; }
+  .contact-copy .addr {
+    display: block;
+    margin-top: 14px;
+    font-size: clamp(1.05rem, 2.1vw, 1.25rem);
+    letter-spacing: .06em;
+    color: var(--dim);
+    overflow-wrap: anywhere;
+  }
+  .elsewhere {
+    margin-top: 34px;
+    border: 1px dashed rgba(138,135,148,.4);
+    padding: 16px 20px 18px;
+    font-size: clamp(1.05rem, 2.1vw, 1.25rem);
+  }
+  .elsewhere h3 { font-weight: normal; font-size: inherit; color: var(--dim); letter-spacing: .14em; margin-bottom: 10px; }
+  .elsewhere ul { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
+  .elsewhere a { color: var(--osd-cyan); text-decoration: none; letter-spacing: .12em; text-shadow: 0 0 8px rgba(94,227,230,.35); }
+  .elsewhere a:hover, .elsewhere a:focus-visible { color: var(--phosphor); }
+  .elsewhere a:focus-visible { outline: 2px dashed var(--osd-cyan); outline-offset: 3px; }
+
+  .deck {
+    background: var(--panel);
+    border: 1px solid rgba(138,135,148,.3);
+    border-top: 3px solid var(--osd-cyan);
+    padding: 16px 20px 22px;
+    box-shadow: 0 0 0 6px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.5);
+  }
+  .deck-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--dim);
+    letter-spacing: .12em;
+    font-size: clamp(.95rem, 1.9vw, 1.1rem);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px dashed rgba(138,135,148,.4);
+  }
+  .deck-bar .on { color: var(--osd-cyan); text-shadow: 0 0 8px rgba(94,227,230,.5); }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    color: var(--dim);
+    letter-spacing: .16em;
+    font-size: clamp(.95rem, 1.9vw, 1.1rem);
+    margin-bottom: 6px;
+  }
+  .field input, .field textarea {
+    width: 100%;
+    background: #0a0910;
+    border: 1px solid rgba(138,135,148,.4);
+    border-radius: 0;
+    color: var(--phosphor);
+    font-family: "VT323", monospace;
+    font-size: clamp(1.15rem, 2.4vw, 1.35rem);
+    letter-spacing: .03em;
+    padding: 9px 12px 6px;
+  }
+  .field textarea { min-height: 150px; resize: vertical; display: block; }
+  .field input:hover, .field textarea:hover { border-color: var(--osd-cyan); }
+  .field input:focus-visible, .field textarea:focus-visible {
+    outline: 2px dashed var(--osd-cyan);
+    outline-offset: 3px;
+    border-color: var(--osd-cyan);
+  }
+
+  /* ---- footer ---- */
+  footer {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 70px 24px 90px;
+    color: var(--dim);
+    letter-spacing: .18em;
+    font-size: clamp(1rem, 2.2vw, 1.2rem);
+    line-height: 1.7;
+  }
+  footer a {
+    color: var(--osd-cyan);
+    text-decoration: none;
+    text-shadow: 0 0 8px rgba(94,227,230,.35);
+  }
+  footer a:hover, footer a:focus-visible { color: var(--phosphor); }
+  footer a:focus-visible { outline: 2px dashed var(--osd-cyan); outline-offset: 3px; }
+  footer .seg { white-space: nowrap; }
+
+  @media (max-width: 1040px) {
+    .screen-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 860px) {
+    .osd-channel, .osd-date { display: none; }
+    nav { top: auto; bottom: 14px; max-width: calc(100vw - 12px); }
+    .vf { inset: 60px 14px 86px; }
+    .scroll-hint { display: none; }
+    #hero { padding: 84px 20px 110px; }
+
+    .lc-row { grid-template-columns: minmax(130px, 170px) 1fr; align-items: start; }
+    .lc-row .cta { grid-column: 2; justify-self: start; margin-top: 6px; }
+  }
+
+  @media (max-width: 800px) {
+    .about-grid, .contact-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 720px) {
+    .chan { padding: 90px 18px 30px; }
+    #hero { padding: 84px 18px 110px; }
+
+    .lc-row { grid-template-columns: 1fr; padding: 18px 16px 18px 14px; }
+    .lc-head { padding: 10px 16px 7px 14px; }
+    .lc-lane { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
+    .lc-run { margin-top: 0; }
+    .lc-row .cta { grid-column: auto; margin-top: 8px; }
+
+    footer .sep { display: none; }
+    footer .seg { display: block; }
+    footer br { display: none; }
+
+    .tape, .shelf.stacked .tape { grid-template-columns: 10px 1fr auto; }
+    .tape .face, .shelf.stacked .tape .face { flex-direction: column; align-items: flex-start; padding: 10px 12px; }
+    .tape .runtime { display: none; }
+    .tape .caret { padding: 0 12px 0 2px; }
+    .tape:hover, .tape:focus-visible { transform: translateX(6px); }
+
+    .tv-frame { padding: 10px; }
+  }
+
+  @media (max-width: 420px) {
+    nav { gap: 0; padding: 5px 6px; }
+    nav a { font-size: 15px; letter-spacing: .03em; padding: 3px 6px; }
+    .aka { letter-spacing: .1em; padding: 8px 14px 5px 12px; border-left-width: 8px; }
+    .about-label { letter-spacing: .08em; padding: 9px 14px 7px; border-left-width: 8px; }
+    .lc-head { letter-spacing: .12em; }
+    .group span { letter-spacing: .16em; }
+    .tape .sticker { letter-spacing: .03em; padding: 3px 9px 1px; }
+  }
+
+  /* short screens (a phone on its side): keep the whole title card in view */
+  @media (max-height: 520px) {
+    #hero { gap: 14px; padding: 62px 20px 76px; }
+    .wordmark { font-size: clamp(2.2rem, 17vh, 7.6rem); gap: 10px; }
+    .aka { font-size: clamp(1.1rem, 6vh, 2.1rem); padding: 6px 16px 4px 14px; }
+    .hero-line br { display: none; }
+    .vf { inset: 52px 14px 60px; }
+    .scroll-hint { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .osd-rec .dot { animation: none; }
+    .scroll-hint { animation: none; }
+    .glitching .main-line::before,
+    .glitching .main-line::after { animation: none; opacity: 0; }
+    .tape, .cta, nav a { transition: none; }
+    .tape:hover, .tape:focus-visible { transform: none; }
+    #static { display: none; }
+  }
+</style>
 </head>
+<body>
 
-<body class="is-preload">
-	<!-- Wrapper -->
-	<div id="wrapper">
+<canvas id="static" aria-hidden="true"></canvas>
 
-		<!-- Header -->
-		<header id="header">
-			<div class="inner">
+<!-- fixed camcorder overlay -->
+<div class="osd osd-rec" aria-hidden="true"><span class="dot">&#9679;</span> REC</div>
+<div class="osd osd-counter" aria-hidden="true">SP 0:00:00</div>
+<div class="osd osd-channel" id="osdChannel" aria-hidden="true">CH 00 &middot; TITLE</div>
+<div class="osd osd-date" id="osdDate" aria-hidden="true"></div>
 
-				<!-- Logo -->
-				<a href="index.html" class="logo">
-					<!-- <span class="symbol"><img src="images/logo.svg" alt="" /></span><span class="title">Phantom</span> -->
-				</a>
+<nav aria-label="Site">
+  <a href="#hero">TITLE</a>
+  <a href="#what">WHAT I DO</a>
+  <a href="#work">THE WORK</a>
+  <a href="#resume">RESUME</a>
+  <a href="#contact">CONTACT</a>
+</nav>
 
-				<!-- Nav -->
-				<nav>
-					<ul>
-						<li><a href="#menu">Menu</a></li>
-					</ul>
-				</nav>
+<main>
 
-			</div>
-		</header>
+<!-- ============ CH 00 · TITLE ============ -->
+<section class="chan" id="hero" data-channel="CH 00 &middot; TITLE">
+  <div class="vf" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 
-		<!-- Menu -->
-		<nav id="menu">
-			<h2>Menu</h2>
-			<ul>
-				<li><a href="index.html">Home</a></li>
-				<li><!--<a href="about.html">--><a href="resumes.html">About / Resume</a></li>
-			</ul>
-		</nav>
+  <h1 class="wordmark" id="wordmark">
+    <span class="main-line" data-t="TOM VELLE">TOM VELLE</span>
+    <span class="aka"><small>A.K.A.</small> TOMMY FILLIATER</span>
+  </h1>
 
-		<!-- Main -->
-		<div id="main">
-			<div class="inner">
-				<header>
-					<h1>tomvelle</h1>
-					<p>I build internet stuff. Video editing, web dev, automation, and weird-but-clean creative
-						projects.</p>
-					<ul class="actions">
-						<li><!--<a href="about.html" class="button primary">--><a class="button primary"href="resumes.html">Resume[s]</a></li>
-						<li><a href="mailto:messagetomvelle@gmail.com" class="button">Email Me</a></li>
-					</ul>
-				</header>
-				<section class="tiles">
-					<article class="style2">
-						<span class="image"><img src="images/pic02.jpg" alt="" /></span>
-						<!--<a href="video.html">--><a href="https://youtube.com/@tomvelle">
-							<h2>Video Editing</h2>
-							<div class="content">
-								<p>Short-form edits, pacing, captions, and meme-accurate timing.</p>
-							</div>
-						</a>
+  <p class="hero-line">I build internet stuff.<br><b>Video editing, <span class="nb">front-end</span> dev, and homemade tools.</b></p>
 
-					</article>
-					<article class="style3">
-						<span class="image"><img src="images/pic03.jpg" alt="" /></span>
-						<!--<a href="creative.html">--><a href="#">
-							<h2>Creative Projects</h2>
-							<div class="content">
-								<p>Experiments, formats, and ongoing series I build in public.</p>
-							</div>
-						</a>
-					</article>
-					<article class="style1">
-						<span class="image"><img src="images/pic01.jpg" alt="" /></span>
-						<!--<a href="webdev.html">--><a href="#">
-							<h2>Web Dev</h2>
-							<div class="content">
-								<p>Front-end, tooling, automation, and tiny apps that ship.</p>
-							</div>
-						</a>
-					</article>
-    <article class="style5">
-      <span class="image"><img src="images/pic05.jpg" alt="" /></span>
-      <!--<a href="post-koth-tooling.html">--><a href="#">
-        <h2>KOTH Script Search Tool</h2>
-        <div class="content">
-          <p>Local app that indexes episode transcripts so I can find lines instantly.</p>
-        </div>
-      </a>
+  <div class="cta-row">
+    <a class="cta" href="#what"><span class="tri">&#9654;</span> SEE WHAT I DO</a>
+    <a class="cta ghost" href="#resume">GET THE RESUME</a>
+  </div>
+
+  <div class="scroll-hint" aria-hidden="true">&#9660; KEEP SCROLLING &#9660;</div>
+</section>
+
+<!-- ============ CH 01 · WHAT I DO ============ -->
+<section class="chan" id="what" data-channel="CH 01 &middot; WHAT I DO">
+  <div class="section-head">
+    <span class="ch">CH 01</span>
+    <h2>WHAT I DO</h2>
+    <span class="rule"></span>
+  </div>
+
+  <!-- EDIT ME: each .lc-row is one lane. is-video, is-web, or is-tool sets the color down the left edge. -->
+  <div class="label-card">
+    <div class="lc-head">
+      <span>WHAT'S ON THIS TAPE</span>
+      <span aria-hidden="true">T-120</span>
+    </div>
+
+    <article class="lc-row is-video">
+      <div class="lc-lane">
+        <h3>VIDEO</h3>
+        <span class="lc-run">SINCE 2004</span>
+      </div>
+      <div class="lc-what">
+        <p>Short-form edits, ongoing series, captions, and <span class="nb">meme-accurate</span> timing.</p>
+        <p class="lc-with">Cut in CapCut, Premiere Pro, and DaVinci Resolve.</p>
+      </div>
+      <a class="cta small ink" href="https://www.youtube.com/@tomvelle" target="_blank" rel="noopener me"><span class="tri">&#9654;</span> WATCH ON YOUTUBE</a>
     </article>
 
-    <article class="style2">
-      <span class="image"><img src="images/pic07.jpg" alt="" /></span>
-      <!--<a href="post-squirrelville.html">--><a href="#">
-        <h2>Squirrelville</h2>
-        <div class="content">
-          <p>24/7 backyard critter cam + worldbuilding + experiments.</p>
-        </div>
-      </a>
+    <article class="lc-row is-web">
+      <div class="lc-lane">
+        <h3>WEB DEV</h3>
+        <span class="lc-run">14 YEARS</span>
+      </div>
+      <div class="lc-what">
+        <p><span class="nb">Front-end</span>, tooling, automation, and tiny apps that ship.</p>
+        <p class="lc-with">HTML, CSS, JavaScript, PHP, SQL. Most recently Senior <span class="nb">Front-End</span> Web Developer at Anthology.</p>
+      </div>
+      <a class="cta small ink" href="assets/dev-resume.pdf" target="_blank" rel="noopener"><span class="tri">&#9654;</span> READ THE DEV RESUME</a>
     </article>
 
-	    <article class="style3">
-      <span class="image"><img src="images/pic08.jpg" alt="" /></span>
-      <!--<a href="post-seasons-visualizer.html">--><a href="#">
-        <h2>Seasons Visualizer Web App</h2>
-        <div class="content">
-          <p>A clean little explainer tool with a 45s record mode for narration.</p>
-        </div>
-      </a>
+    <article class="lc-row is-tool">
+      <div class="lc-lane">
+        <h3>TOOLS</h3>
+        <span class="lc-run">20+ BUILT</span>
+      </div>
+      <div class="lc-what">
+        <p>When the right tool doesn't exist, I build it. One HTML file, runs in a browser, nothing to install.</p>
+        <p class="lc-with">Title animators, minimap generators, caption splitters, transcript search.</p>
+      </div>
+      <a class="cta small ink" href="https://puzzleverse.productions/toolshop.html" target="_blank" rel="noopener"><span class="tri">&#9654;</span> OPEN THE TOOLSHOP</a>
     </article>
+  </div>
+</section>
 
-				</section>
-			</div>
-		</div>
+<!-- ============ CH 02 · THE WORK ============ -->
+<section class="chan" id="work" data-channel="CH 02 &middot; THE WORK">
+  <div class="section-head">
+    <span class="ch">CH 02</span>
+    <h2>THE WORK</h2>
+    <span class="rule"></span>
+  </div>
 
-		<!-- Footer -->
-		<footer id="footer">
-			<div class="inner">
-				<section>
-					<h2>Get in touch</h2>
-					<form method="post" action="https://formspree.io/f/mjggvqey">
-						<div class="fields">
-							<div class="field half">
-								<input type="text" name="name" id="name" placeholder="Name" />
-							</div>
-							<div class="field half">
-								<input type="email" name="email" id="email" placeholder="Email" />
-							</div>
-							<div class="field">
-								<textarea name="message" id="message" placeholder="Message"></textarea>
-							</div>
-						</div>
-						<ul class="actions">
-							<li><input type="submit" value="Send" class="primary" /></li>
-						</ul>
-					</form>
-				</section>
-				<section>
-					<h2>Follow</h2>
-					<ul class="icons">
-						<li><a target="_blank" href="https://x.com/tomvelle" class="icon brands style2 fa-twitter"><span class="label">Twitter</span></a>
-						</li>
-						<li><a target="_blank" href="https://www.facebook.com/realtomvelle" class="icon brands style2 fa-facebook-f"><span class="label">Facebook</span></a>
-						</li>
-						<li><a target="_blank" href="https://www.instagram.com/tom.velle" class="icon brands style2 fa-instagram"><span class="label">Instagram</span></a>
-						</li>
-						<li><a target="_blank" href="https://github.com/tomvelle" class="icon brands style2 fa-github"><span class="label">GitHub</span></a></li>
-						<li><a target="_blank" href="mailto:messagetomvelle@gmail.com" class="icon solid style2 fa-envelope"><span class="label">Email</span></a></li>
-					</ul>
-				</section>
-				<ul class="copyright">
-					<li>&copy; tv. All rights reserved</li>
-				</ul>
-			</div>
-		</footer>
+  <h3 class="group first"><span>ON SCREEN</span></h3>
 
-	</div>
+  <!-- The TV plays your newest regular upload on its own.
+       To pin one video instead, set FEATURED_VIDEO at the top of the script below. -->
+  <div class="screen-grid">
+    <div class="tv-frame">
+      <div class="tv-screen">
+        <div class="tv-standby">
+          <span>LOADING TAPE&#8230;</span>
+          <a href="https://www.youtube.com/@tomvelle" target="_blank" rel="noopener me">OR WATCH ON YOUTUBE &#9654;</a>
+        </div>
+        <iframe id="tv"
+          src="https://www.youtube.com/embed/videoseries?list=UULFdMh8CmQWJ1o18q2iPvUXyg"
+          title="Tom Velle on YouTube"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen></iframe>
+      </div>
+      <div class="tv-caption">
+        <span><b>NOW PLAYING:</b> <span id="tvWhat">THE NEWEST UPLOAD</span></span>
+        <a href="https://www.youtube.com/@tomvelle" target="_blank" rel="noopener me">THE FULL ARCHIVE &#9654;</a>
+      </div>
+    </div>
 
-	<!-- Scripts -->
-	<script src="assets/js/jquery.min.js"></script>
-	<script src="assets/js/browser.min.js"></script>
-	<script src="assets/js/breakpoints.min.js"></script>
-	<script src="assets/js/util.js"></script>
-	<script src="assets/js/main.js"></script>
+    <!-- EDIT ME: each .tape is one link. is-video = magenta stripe, is-web = cyan, is-tool = amber. -->
+    <div class="shelf stacked">
+      <a class="tape is-video" href="https://puzzleverse.productions/" target="_blank" rel="noopener me">
+        <span class="stripe"></span>
+        <span class="face">
+          <span class="sticker">PUZZLEVERSE PRODUCTIONS</span>
+          <span class="desc">My <span class="nb">one-person</span> studio. Every series lives here.</span>
+        </span>
+        <span class="runtime">STUDIO</span>
+        <span class="caret" aria-hidden="true">&#9654;</span>
+      </a>
+
+      <a class="tape is-video" href="https://www.youtube.com/playlist?list=PLCo7LZRNauTOWGSSBIR1Ux5aO6vgubJ0m" target="_blank" rel="noopener">
+        <span class="stripe"></span>
+        <span class="face">
+          <span class="sticker">SPACEBALLS: THE EDITS</span>
+          <span class="desc">A fan edit series built around one movie that never runs out of angles.</span>
+        </span>
+        <span class="runtime">SERIES</span>
+        <span class="caret" aria-hidden="true">&#9654;</span>
+      </a>
+
+      <a class="tape is-video" href="https://www.twitch.tv/squirrelville" target="_blank" rel="noopener">
+        <span class="stripe"></span>
+        <span class="face">
+          <span class="sticker">SQUIRRELVILLE</span>
+          <span class="desc">Backyard wildlife, one basset hound, zero scripts.</span>
+        </span>
+        <span class="runtime">WILDLIFE</span>
+        <span class="caret" aria-hidden="true">&#9654;</span>
+      </a>
+    </div>
+  </div><!-- /.screen-grid -->
+
+  <!-- TOOLS SHELF
+       This whole block stays hidden until it holds at least one tape.
+       Paste tool tapes between the two marker lines. Newest first. Template:
+
+       <a class="tape is-tool" href="tools/yourtool.html" target="_blank" rel="noopener">
+         <span class="stripe"></span>
+         <span class="face">
+           <span class="sticker">TOOL NAME</span>
+           <span class="desc">What it does, in one plain line.</span>
+         </span>
+         <span class="runtime">KIND</span>
+         <span class="caret" aria-hidden="true">&#9654;</span>
+       </a>
+  -->
+  <div class="tool-group">
+    <h3 class="group"><span>IN YOUR BROWSER</span></h3>
+    <p class="group-note">These run in your browser. Open one and mess with it.</p>
+
+    <div class="shelf">
+      <!-- TOOL TAPES START -->
+      <!-- TOOL TAPES END -->
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH 03 · RESUME ============ -->
+<section class="chan" id="resume" data-channel="CH 03 &middot; RESUME">
+  <div class="section-head">
+    <span class="ch">CH 03</span>
+    <h2>RESUME</h2>
+    <span class="rule"></span>
+  </div>
+
+  <div class="about-grid">
+    <div class="about-copy">
+      <span class="about-label">FILED UNDER: TOMMY FILLIATER</span>
+      <p><b>Tom Velle is the name on the work. Tommy Filliater is the name on the resume.</b> Same guy.</p>
+      <p>I spent 14 years as a <span class="nb">front-end</span> developer, and I've been cutting video since 2004. Now I do both, and I build the tools in between.</p>
+      <p>Pick the version that fits what you're hiring for.</p>
+
+      <div class="cta-row">
+        <a class="cta" href="assets/creator-resume.pdf" target="_blank" rel="noopener"><span class="tri">&#9654;</span> CREATOR RESUME</a>
+        <a class="cta" href="assets/dev-resume.pdf" target="_blank" rel="noopener"><span class="tri">&#9654;</span> DEV RESUME</a>
+      </div>
+      <p>Same name on <a href="https://www.linkedin.com/in/tommyfilliater/" target="_blank" rel="noopener me">LinkedIn</a>.</p>
+    </div>
+
+    <dl class="spec-sheet">
+      <dt>ON THE RESUME</dt>
+      <dd class="loud">Tommy Filliater</dd>
+      <dt>ON THE WORK</dt>
+      <dd class="loud">Tom Velle</dd>
+      <dt>BASED IN</dt>
+      <dd>Cincinnati, OH</dd>
+      <dt>EXPERIENCE</dt>
+      <dd>14 years <span class="nb">front-end</span>, 20+ years video</dd>
+      <dt>LAST ROLE</dt>
+      <dd>Senior <span class="nb">Front-End</span> Web Developer, Anthology Inc.</dd>
+      <dt>SCHOOL</dt>
+      <dd>Xavier University, B.S. Computer Science</dd>
+      <dt>OPEN TO</dt>
+      <dd><span class="nb">Full-time</span>, contract, freelance</dd>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ CH 04 · CONTACT ============ -->
+<section class="chan" id="contact" data-channel="CH 04 &middot; CONTACT">
+  <div class="section-head">
+    <span class="ch">CH 04</span>
+    <h2>CONTACT</h2>
+    <span class="rule"></span>
+  </div>
+
+  <div class="contact-grid">
+    <div class="contact-copy">
+      <p>Hiring? Got a project? Stuck doing the same step by hand forty times a week? <b>Tell me about it.</b></p>
+      <a class="cta" href="mailto:messagetomvelle@gmail.com"><span class="tri">&#9654;</span> EMAIL ME</a>
+      <span class="addr">messagetomvelle@gmail.com</span>
+
+      <div class="elsewhere">
+        <h3>ELSEWHERE</h3>
+        <ul>
+          <li><a href="https://www.youtube.com/@tomvelle" target="_blank" rel="noopener me">YOUTUBE</a></li>
+          <li><a href="https://www.linkedin.com/in/tommyfilliater/" target="_blank" rel="noopener me">LINKEDIN</a></li>
+          <li><a href="https://www.instagram.com/tom.velle" target="_blank" rel="noopener me">INSTAGRAM</a></li>
+          <li><a href="https://github.com/tomvelle" target="_blank" rel="noopener me">GITHUB</a></li>
+          <li><a href="https://x.com/tomvelle" target="_blank" rel="noopener me">X</a></li>
+          <li><a href="https://www.facebook.com/realtomvelle" target="_blank" rel="noopener me">FACEBOOK</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <form class="deck" method="post" action="https://formspree.io/f/mjggvqey">
+      <div class="deck-bar">
+        <span>LEAVE A MESSAGE</span>
+        <span class="on" aria-hidden="true">&#9679; READY</span>
+      </div>
+      <div class="field">
+        <label for="name">NAME</label>
+        <input type="text" name="name" id="name" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label for="email">EMAIL</label>
+        <input type="email" name="email" id="email" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="message">MESSAGE</label>
+        <textarea name="message" id="message" required></textarea>
+      </div>
+      <button class="cta" type="submit"><span class="tri">&#9654;</span> SEND MESSAGE</button>
+    </form>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <span class="seg">TOM VELLE IS TOMMY FILLIATER</span><span class="sep"> &middot; </span><span class="seg">CINCINNATI, OH</span><br>
+  <span class="seg">A <a href="https://puzzleverse.productions/" target="_blank" rel="noopener me">PUZZLEVERSE</a> PRODUCTION</span><span class="sep"> &middot; </span><span class="seg">BE KIND, REWIND</span>
+</footer>
+
+<script>
+  /* =====================================================================
+     EDIT ME
+     The TV in THE WORK plays your newest regular upload automatically.
+     To pin one video, paste its YouTube ID between the quotes
+     (the part after "v=" in the link). Leave it empty to go back to newest.
+     ===================================================================== */
+  const FEATURED_VIDEO = "";
+  /* ===================================================================== */
+
+  if (FEATURED_VIDEO) {
+    document.getElementById('tv').src =
+      'https://www.youtube.com/embed/' + encodeURIComponent(FEATURED_VIDEO);
+    document.getElementById('tvWhat').textContent = 'A FEATURED VIDEO';
+  }
+
+  // tape counter, counting from page load
+  const counter = document.querySelector('.osd-counter');
+  const start = Date.now();
+  function tick() {
+    const s = Math.floor((Date.now() - start) / 1000);
+    const h = Math.floor(s / 3600);
+    const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const sec = String(s % 60).padStart(2, '0');
+    counter.textContent = 'SP ' + h + ':' + m + ':' + sec;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // camcorder date stamp, bottom right
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const now = new Date();
+  document.getElementById('osdDate').textContent =
+    months[now.getMonth()] + ' ' + String(now.getDate()).padStart(2, '0') + ' ' + now.getFullYear();
+
+  // occasional RGB-split glitch on the name
+  const wm = document.getElementById('wordmark');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function glitch() {
+    if (!reduced) {
+      wm.classList.add('glitching');
+      setTimeout(() => wm.classList.remove('glitching'), 400);
+    }
+    setTimeout(glitch, 2600 + Math.random() * 4200);
+  }
+  setTimeout(glitch, 1400);
+
+  // OSD channel readout + nav highlight follow the section in view
+  const osdChannel = document.getElementById('osdChannel');
+  const navLinks = document.querySelectorAll('nav a');
+  const sections = document.querySelectorAll('section[data-channel]');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        osdChannel.textContent = e.target.dataset.channel;
+        navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id));
+      }
+    });
+  }, { rootMargin: '-45% 0px -45% 0px' });
+  sections.forEach(s => io.observe(s));
+
+  // low-key animated static
+  const canvas = document.getElementById('static');
+  const ctx = canvas.getContext('2d');
+  function resize() {
+    canvas.width = Math.floor(window.innerWidth / 3);
+    canvas.height = Math.floor(window.innerHeight / 3);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  function noise() {
+    if (reduced) return;
+    const img = ctx.createImageData(canvas.width, canvas.height);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = (Math.random() * 255) | 0;
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    requestAnimationFrame(() => setTimeout(noise, 90));
+  }
+  noise();
+</script>
 
 </body>
-
 </html>
