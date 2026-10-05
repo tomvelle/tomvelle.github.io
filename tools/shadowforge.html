@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShadowForge</title>
+<style>
+  :root{
+    --bg:#17171a; --panel:#1f1f24; --panel2:#26262c; --border:#2e2e35;
+    --text:#e8e6e1; --muted:#9a97a0; --accent:#f2a33c; --accent-deep:#b8721f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.5 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{
+    display:flex; align-items:center; gap:12px;
+    padding:10px 18px; border-bottom:1px solid var(--border); background:var(--panel);
+    flex:0 0 auto;
+  }
+  .wordmark{font-size:17px; font-weight:600; letter-spacing:.12em; text-transform:uppercase;}
+  .wordmark span{color:var(--accent);}
+  .tagline{color:var(--muted); font-size:12px;}
+  main{flex:1; display:flex; min-height:0;}
+  #stageWrap{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    padding:16px; min-width:0; position:relative;
+    background:
+      linear-gradient(45deg,#1b1b1f 25%,transparent 25%,transparent 75%,#1b1b1f 75%),
+      linear-gradient(45deg,#1b1b1f 25%,transparent 25%,transparent 75%,#1b1b1f 75%);
+    background-size:24px 24px; background-position:0 0,12px 12px; background-color:#141417;
+  }
+  #stage{max-width:100%; max-height:100%; box-shadow:0 0 0 1px var(--border); touch-action:none; cursor:grab;}
+  #stage.setting{cursor:crosshair;}
+  #dropHint{
+    position:absolute; inset:0; display:flex; flex-direction:column; gap:6px;
+    align-items:center; justify-content:center; color:var(--muted); pointer-events:none;
+    text-align:center; padding:20px;
+  }
+  #dropHint b{color:var(--text);}
+  aside{
+    width:320px; flex:0 0 auto; overflow-y:auto;
+    background:var(--panel); border-left:1px solid var(--border); padding:14px 16px 40px;
+  }
+  h2{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    margin:18px 0 8px; border-top:1px solid var(--border); padding-top:14px;
+  }
+  h2:first-child{margin-top:0; border-top:none; padding-top:0;}
+  .row{display:flex; gap:8px; margin-bottom:8px;}
+  .row.wrap{flex-wrap:wrap;}
+  button, label.filebtn{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    padding:7px 10px; border-radius:7px; cursor:pointer; font:inherit; font-size:13px;
+    flex:1; text-align:center; user-select:none;
+  }
+  button:hover, label.filebtn:hover{border-color:var(--accent-deep);}
+  button.on{background:var(--accent-deep); border-color:var(--accent); color:#fff;}
+  button.primary{background:var(--accent-deep); border-color:var(--accent); color:#fff; font-weight:600;}
+  button.primary:hover{background:var(--accent); color:#1a1206;}
+  button.mini{flex:0 0 auto; padding:5px 9px; font-size:12px;}
+  input[type=file]{display:none;}
+  .slider{display:flex; align-items:center; gap:10px; margin-bottom:7px;}
+  .slider label{flex:0 0 108px; color:var(--muted); font-size:12.5px;}
+  .slider input[type=range]{flex:1; accent-color:var(--accent); min-width:0;}
+  .slider output{flex:0 0 38px; text-align:right; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .hint{color:var(--muted); font-size:12px; margin:6px 0 2px;}
+  .hint b{color:var(--text); font-weight:600;}
+  #dialWrap{display:flex; align-items:center; gap:14px; margin:8px 0 4px;}
+  #dial{
+    position:relative; width:150px; height:150px; flex:0 0 auto;
+    border:1px solid var(--border); border-radius:50%; background:var(--panel2);
+    touch-action:none; cursor:pointer;
+  }
+  #dial::after{
+    content:""; position:absolute; left:50%; top:50%; width:6px; height:6px; margin:-3px;
+    border-radius:50%; background:var(--muted);
+  }
+  #dialRing{position:absolute; inset:22px; border:1px dashed #3a3a42; border-radius:50%; pointer-events:none;}
+  #sunHandle{
+    position:absolute; width:22px; height:22px; margin:-11px; border-radius:50%;
+    background:var(--accent); border:2px solid #fff3; pointer-events:none;
+  }
+  #shadowNeedle{position:absolute; left:50%; top:50%; height:2px; background:#5c5c66; transform-origin:0 50%; pointer-events:none;}
+  .dialSide{font-size:12px; color:var(--muted); line-height:1.6;}
+  .dialSide b{color:var(--accent); font-weight:600;}
+  #foldControls{display:none;}
+  #foldControls.show{display:block;}
+  .toast{
+    position:absolute; left:50%; bottom:18px; transform:translateX(-50%);
+    background:var(--panel2); border:1px solid var(--accent-deep); color:var(--text);
+    padding:8px 14px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .25s;
+    pointer-events:none; white-space:nowrap;
+  }
+  .toast.show{opacity:1;}
+  @media (max-width:760px){
+    main{flex-direction:column;}
+    aside{width:100%; border-left:none; border-top:1px solid var(--border);}
+    #stageWrap{min-height:44vh;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wordmark">Shadow<span>Forge</span></div>
+  <div class="tagline">cast a shadow, sell the composite</div>
+</header>
+<main>
+  <div id="stageWrap">
+    <canvas id="stage" width="1200" height="800"></canvas>
+    <div id="dropHint">
+      <b>Load a photo, then load a cutout PNG.</b>
+      <div>Drag the cutout into place. Drag the sun to aim the shadow.</div>
+      <div style="font-size:12px; max-width:420px;">Working from a finished composite? Load the composite as the photo, load the same cutout you used, and line it up over itself. It becomes the shadow stencil.</div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+  <aside>
+    <h2>Images</h2>
+    <div class="row">
+      <label class="filebtn">Load photo<input type="file" id="bgFile" accept="image/*"></label>
+      <label class="filebtn">Load cutout<input type="file" id="cutFile" accept="image/png,image/webp,image/*"></label>
+    </div>
+
+    <h2>Cutout</h2>
+    <div class="slider"><label>Size</label><input type="range" id="cScale" min="0.05" max="3" step="0.01" value="1"><output id="cScaleO">1.00</output></div>
+    <div class="slider"><label>Rotation</label><input type="range" id="cRot" min="-180" max="180" step="0.5" value="0"><output id="cRotO">0&deg;</output></div>
+    <div class="row">
+      <button id="anchorBtn">Set foot point</button>
+      <button id="resetCut" class="mini" title="Center the cutout">Center</button>
+    </div>
+    <div class="hint">The foot point is where the shadow touches the ground. Click the button, then click his feet.</div>
+
+    <h2>Sun</h2>
+    <div id="dialWrap">
+      <div id="dial">
+        <div id="dialRing"></div>
+        <div id="shadowNeedle"></div>
+        <div id="sunHandle"></div>
+      </div>
+      <div class="dialSide">
+        Drag the <b>sun</b>.<br>
+        Shadow falls opposite.<br>
+        Closer to the edge = lower sun = longer shadow.
+      </div>
+    </div>
+    <div class="row wrap">
+      <button class="mini preset" data-az="200" data-len="1.5">Golden, sun right</button>
+      <button class="mini preset" data-az="340" data-len="1.5">Golden, sun left</button>
+      <button class="mini preset" data-az="270" data-len="0.35">Noon</button>
+      <button class="mini preset" data-az="250" data-len="0.6">Overcast</button>
+    </div>
+
+    <h2>Shadow look</h2>
+    <div class="slider"><label>Opacity</label><input type="range" id="sOpacity" min="0" max="1" step="0.01" value="0.55"><output id="sOpacityO">55%</output></div>
+    <div class="slider"><label>Softness</label><input type="range" id="sBlur" min="0" max="40" step="0.5" value="14"><output id="sBlurO">14</output></div>
+    <div class="slider"><label>Distance fade</label><input type="range" id="sFade" min="0" max="0.9" step="0.01" value="0.45"><output id="sFadeO">45%</output></div>
+    <div class="slider"><label>Contact dark</label><input type="range" id="cStrength" min="0" max="1" step="0.01" value="0.5"><output id="cStrengthO">50%</output></div>
+    <div class="slider"><label>Contact size</label><input type="range" id="cSize" min="0" max="2.5" step="0.01" value="0.8"><output id="cSizeO">0.80</output></div>
+
+    <h2>Fold (walls &amp; curbs)</h2>
+    <div class="row"><button id="foldBtn">Fold: off</button></div>
+    <div id="foldControls">
+      <div class="hint">Drag the two <b>amber handles</b> so the dashed line sits along the base of the wall or curb. Shadow past the line climbs it.</div>
+      <div class="slider"><label>Climb</label><input type="range" id="fClimb" min="0.3" max="1.8" step="0.01" value="1"><output id="fClimbO">1.00</output></div>
+    </div>
+
+    <h2>Export</h2>
+    <div class="row">
+      <button id="expShadow" class="primary">Shadow PNG</button>
+      <button id="expComp" class="primary">Composite PNG</button>
+    </div>
+    <div class="hint">Shadow PNG is transparent, canvas-sized, opacity baked in. Drop it in CapCut under your cutout layer and it lands in the same spot.</div>
+  </aside>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const stage = $('stage'), ctx = stage.getContext('2d');
+
+const state = {
+  bg:null, cut:null, sil:null,
+  pos:{x:600,y:400}, scale:1, rot:0,
+  anchor:{x:0,y:0},                 // cutout local px coords
+  az:200*Math.PI/180, len:1.5,      // shadow direction (rad, screen coords) + length factor
+  opacity:0.55, blur:14, fade:0.45,
+  contactStrength:0.5, contactSize:0.8,
+  fold:false, f1:null, f2:null, climb:1,
+  settingAnchor:false, dragging:null, fast:false
+};
+
+/* ---------- helpers ---------- */
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function loadImage(file, cb){
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = ()=>{ URL.revokeObjectURL(url); cb(img); };
+  img.src = url;
+}
+function makeSilhouette(img){
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(img,0,0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = '#000'; g.fillRect(0,0,c.width,c.height);
+  return c;
+}
+function fitCanvasToBg(){
+  if(state.bg){ stage.width = state.bg.naturalWidth; stage.height = state.bg.naturalHeight; }
+  else if(state.cut){ stage.width = Math.round(state.cut.naturalWidth*2.2); stage.height = Math.round(state.cut.naturalHeight*1.6); }
+  if(!state.f1){ state.f1 = {x:stage.width*0.55, y:stage.height*0.35}; state.f2 = {x:stage.width*0.95, y:stage.height*0.45}; }
+}
+function canvasPoint(ev){
+  const r = stage.getBoundingClientRect();
+  return { x:(ev.clientX-r.left) * stage.width/r.width, y:(ev.clientY-r.top) * stage.height/r.height };
+}
+function dispScale(){ const r = stage.getBoundingClientRect(); return stage.width/r.width; }
+
+/* cutout local <-> world (cutout drawn centered at pos, rotated, scaled) */
+function localToWorld(lx, ly){
+  const w = state.cut.naturalWidth, h = state.cut.naturalHeight;
+  const vx = (lx - w/2)*state.scale, vy = (ly - h/2)*state.scale;
+  const c = Math.cos(state.rot), s = Math.sin(state.rot);
+  return { x: state.pos.x + vx*c - vy*s, y: state.pos.y + vx*s + vy*c };
+}
+function worldToLocal(px, py){
+  const w = state.cut.naturalWidth, h = state.cut.naturalHeight;
+  const dx = px - state.pos.x, dy = py - state.pos.y;
+  const c = Math.cos(-state.rot), s = Math.sin(-state.rot);
+  return { x:(dx*c - dy*s)/state.scale + w/2, y:(dx*s + dy*c)/state.scale + h/2 };
+}
+
+/* ---------- shadow pipeline ---------- */
+let bufA = document.createElement('canvas');   // sharp unfolded shadow
+let bufB = document.createElement('canvas');   // sharp folded shadow
+let bufS = document.createElement('canvas');   // final soft shadow (pre-opacity)
+function sizeBufs(){ for(const b of [bufA,bufB,bufS]){ b.width = stage.width; b.height = stage.height; } }
+
+function shadowTransform(){
+  // maps cutout-local px -> canvas space, projecting height above anchor along shadow direction
+  const s = state.scale, r = state.rot;
+  const cr = Math.cos(r), sr = Math.sin(r);
+  const ax = state.anchor.x, ay = state.anchor.y;
+  const A = localToWorld(ax, ay);
+  const dir = { x: Math.cos(state.az), y: Math.sin(state.az) };
+  const a = cr*s, b = sr*s;                              // x axis follows cutout rotation/scale
+  const c = -dir.x*state.len*s, d = -dir.y*state.len*s;  // local "up" maps along shadow direction
+  const e = A.x - a*ax - c*ay, f = A.y - b*ax - d*ay;
+  return { m:[a,b,c,d,e,f], A, dir };
+}
+
+function foldGeometry(dir){
+  const p1 = state.f1, p2 = state.f2;
+  let ldx = p2.x-p1.x, ldy = p2.y-p1.y;
+  const L = Math.hypot(ldx,ldy) || 1; ldx/=L; ldy/=L;
+  let nx = -ldy, ny = ldx, c = nx*p1.x + ny*p1.y;
+  return { p1,p2, ld:{x:ldx,y:ldy}, n:{x:nx,y:ny}, c };
+}
+
+function halfPlanePath(g, geo, side){
+  // side +1 : region where n.P - c >= 0 ; side -1 : opposite. Big quad.
+  const B = (stage.width+stage.height)*3;
+  const q1 = { x: geo.p1.x - geo.ld.x*B, y: geo.p1.y - geo.ld.y*B };
+  const q2 = { x: geo.p1.x + geo.ld.x*B, y: geo.p1.y + geo.ld.y*B };
+  g.beginPath();
+  g.moveTo(q1.x, q1.y); g.lineTo(q2.x, q2.y);
+  g.lineTo(q2.x + geo.n.x*B*side, q2.y + geo.n.y*B*side);
+  g.lineTo(q1.x + geo.n.x*B*side, q1.y + geo.n.y*B*side);
+  g.closePath();
+}
+
+function render(){
+  if(!state.cut){ ctx.clearRect(0,0,stage.width,stage.height); if(state.bg) ctx.drawImage(state.bg,0,0); return; }
+  renderScene(ctx, true);
+}
+
+function buildShadowBuffer(){
+  sizeBufs();
+  const { m, A, dir } = shadowTransform();
+
+  // 1. sharp unfolded silhouette shadow
+  const gA = bufA.getContext('2d');
+  gA.setTransform(1,0,0,1,0,0); gA.clearRect(0,0,bufA.width,bufA.height);
+  gA.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);
+  gA.drawImage(state.sil,0,0);
+  gA.setTransform(1,0,0,1,0,0);
+
+  // 2. fold
+  const gB = bufB.getContext('2d');
+  gB.setTransform(1,0,0,1,0,0); gB.clearRect(0,0,bufB.width,bufB.height);
+  let folded = false;
+  if(state.fold){
+    const geo = foldGeometry(dir);
+    // orient normal toward the anchor: anchor side is "near ground" side
+    let sideA = geo.n.x*A.x + geo.n.y*A.y - geo.c;
+    if(sideA < 0){ geo.n.x*=-1; geo.n.y*=-1; geo.c*=-1; sideA*=-1; }
+    const D = geo.n.x*dir.x + geo.n.y*dir.y;   // negative when shadow travels toward the wall
+    if(Math.abs(D) > 0.06 && D < 0){
+      folded = true;
+      // ground part: near half-plane
+      gB.save(); halfPlanePath(gB, geo, +1); gB.clip();
+      gB.drawImage(bufA,0,0); gB.restore();
+      // wall part: affine remap of far half-plane
+      const kx = -dir.x/D, ky = (-dir.y - state.climb)/D;
+      const Ma = 1 + kx*geo.n.x, Mc = kx*geo.n.y, Me = -kx*geo.c;
+      const Mb = ky*geo.n.x, Md = 1 + ky*geo.n.y, Mf = -ky*geo.c;
+      // destination clip = image of far half-plane under M
+      const B = (stage.width+stage.height)*3;
+      const pts = [
+        {x:geo.p1.x - geo.ld.x*B, y:geo.p1.y - geo.ld.y*B},
+        {x:geo.p1.x + geo.ld.x*B, y:geo.p1.y + geo.ld.y*B}
+      ];
+      const far = pts.map(p=>({x:p.x - geo.n.x*B, y:p.y - geo.n.y*B}));
+      const tp = p => ({ x: Ma*p.x + Mc*p.y + Me, y: Mb*p.x + Md*p.y + Mf });
+      const poly = [pts[0], pts[1], tp(far[1]), tp(far[0])];
+      gB.save();
+      gB.beginPath(); gB.moveTo(poly[0].x, poly[0].y);
+      for(let i=1;i<4;i++) gB.lineTo(poly[i].x, poly[i].y);
+      gB.closePath(); gB.clip();
+      gB.transform(Ma,Mb,Mc,Md,Me,Mf);
+      gB.drawImage(bufA,0,0);
+      gB.restore();
+    }
+  }
+  if(!folded) gB.drawImage(bufA,0,0);
+
+  // 3. distance blur + fade, radial bands from anchor
+  const gS = bufS.getContext('2d');
+  gS.setTransform(1,0,0,1,0,0); gS.clearRect(0,0,bufS.width,bufS.height);
+  const cutH = state.cut.naturalHeight*state.scale;
+  const maxDist = Math.max(cutH*state.len*1.25 + 80, 160);
+  const N = state.fast ? 3 : 7;
+  const nearBlur = Math.max(state.blur*0.1, 0.3);
+  for(let i=0;i<N;i++){
+    const r0 = maxDist*i/N;
+    const r1 = (i===N-1) ? Math.max(stage.width,stage.height)*2 : maxDist*(i+1)/N;
+    const t = N===1 ? 0 : i/(N-1);
+    gS.save();
+    gS.beginPath();
+    gS.arc(A.x, A.y, r1, 0, Math.PI*2);
+    gS.arc(A.x, A.y, Math.max(r0,0.01), 0, Math.PI*2, true);
+    gS.clip();
+    gS.filter = 'blur(' + (nearBlur + (state.blur-nearBlur)*t).toFixed(1) + 'px)';
+    gS.globalAlpha = 1 - state.fade*t;
+    gS.drawImage(bufB,0,0);
+    gS.restore();
+  }
+  gS.filter = 'none'; gS.globalAlpha = 1;
+
+  // 4. contact shadow pooled at the anchor
+  if(state.contactStrength > 0){
+    const rw = Math.max(state.cut.naturalWidth*state.scale*0.35*state.contactSize, 6);
+    const rh = rw*0.32;
+    gS.save();
+    gS.translate(A.x, A.y); gS.scale(1, rh/rw);
+    const grad = gS.createRadialGradient(0,0,0, 0,0,rw);
+    grad.addColorStop(0, 'rgba(0,0,0,' + state.contactStrength + ')');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    gS.fillStyle = grad;
+    gS.beginPath(); gS.arc(0,0,rw,0,Math.PI*2); gS.fill();
+    gS.restore();
+  }
+  return A;
+}
+
+function renderScene(g, overlays){
+  const A = buildShadowBuffer();
+  g.setTransform(1,0,0,1,0,0);
+  g.clearRect(0,0,stage.width,stage.height);
+  if(state.bg) g.drawImage(state.bg,0,0);
+  g.globalAlpha = state.opacity;
+  g.drawImage(bufS,0,0);
+  g.globalAlpha = 1;
+  // cutout on top
+  g.save();
+  g.translate(state.pos.x, state.pos.y); g.rotate(state.rot); g.scale(state.scale, state.scale);
+  g.drawImage(state.cut, -state.cut.naturalWidth/2, -state.cut.naturalHeight/2);
+  g.restore();
+
+  if(!overlays) return;
+  const ds = dispScale();
+  // anchor marker
+  g.save();
+  g.strokeStyle = '#f2a33c'; g.lineWidth = 1.5*ds;
+  g.beginPath(); g.arc(A.x, A.y, 6*ds, 0, Math.PI*2); g.stroke();
+  g.beginPath(); g.moveTo(A.x-10*ds, A.y); g.lineTo(A.x+10*ds, A.y);
+  g.moveTo(A.x, A.y-10*ds); g.lineTo(A.x, A.y+10*ds); g.stroke();
+  g.restore();
+  // fold line + handles
+  if(state.fold){
+    const geo = foldGeometry();
+    const B = (stage.width+stage.height)*2;
+    g.save();
+    g.strokeStyle = '#f2a33c'; g.lineWidth = 1.5*ds; g.setLineDash([8*ds,6*ds]);
+    g.beginPath();
+    g.moveTo(geo.p1.x - geo.ld.x*B, geo.p1.y - geo.ld.y*B);
+    g.lineTo(geo.p1.x + geo.ld.x*B, geo.p1.y + geo.ld.y*B);
+    g.stroke();
+    g.setLineDash([]);
+    for(const p of [state.f1, state.f2]){
+      g.fillStyle = '#f2a33c';
+      g.beginPath(); g.arc(p.x, p.y, 8*ds, 0, Math.PI*2); g.fill();
+      g.strokeStyle = '#17171a'; g.lineWidth = 2*ds;
+      g.beginPath(); g.arc(p.x, p.y, 8*ds, 0, Math.PI*2); g.stroke();
+    }
+    g.restore();
+  }
+}
+
+/* ---------- pointer interactions on stage ---------- */
+stage.addEventListener('pointerdown', ev=>{
+  if(!state.cut) return;
+  const p = canvasPoint(ev);
+  stage.setPointerCapture(ev.pointerId);
+  if(state.settingAnchor){
+    const l = worldToLocal(p.x, p.y);
+    state.anchor = { x: Math.max(0, Math.min(state.cut.naturalWidth, l.x)),
+                     y: Math.max(0, Math.min(state.cut.naturalHeight, l.y)) };
+    state.settingAnchor = false;
+    $('anchorBtn').classList.remove('on'); stage.classList.remove('setting');
+    toast('Foot point set');
+    render(); return;
+  }
+  const ds = dispScale();
+  if(state.fold){
+    for(const key of ['f1','f2']){
+      const h = state[key];
+      if(Math.hypot(p.x-h.x, p.y-h.y) < 16*ds){ state.dragging = {type:key}; state.fast = true; return; }
+    }
+  }
+  // drag cutout if hit, else reposition it under the pointer? just hit-test bounds
+  const l = worldToLocal(p.x, p.y);
+  if(l.x>=0 && l.y>=0 && l.x<=state.cut.naturalWidth && l.y<=state.cut.naturalHeight){
+    state.dragging = { type:'cut', ox: p.x-state.pos.x, oy: p.y-state.pos.y };
+    state.fast = true;
+  }
+});
+stage.addEventListener('pointermove', ev=>{
+  if(!state.dragging) return;
+  const p = canvasPoint(ev);
+  if(state.dragging.type === 'cut'){ state.pos.x = p.x-state.dragging.ox; state.pos.y = p.y-state.dragging.oy; }
+  else { state[state.dragging.type] = { x:p.x, y:p.y }; }
+  render();
+});
+function endDrag(){ if(state.dragging){ state.dragging = null; state.fast = false; render(); } }
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+
+/* ---------- sun dial ---------- */
+const dial = $('dial');
+function dialLayout(){
+  const R = dial.clientWidth/2;
+  const sunAz = state.az + Math.PI;                 // sun opposite the shadow
+  const rad = 14 + (Math.min(state.len,2.5)-0.1)/(2.5-0.1) * (R-26);
+  const sx = R + Math.cos(sunAz)*rad, sy = R + Math.sin(sunAz)*rad;
+  $('sunHandle').style.left = sx+'px'; $('sunHandle').style.top = sy+'px';
+  const nd = $('shadowNeedle');
+  nd.style.width = (R-14)+'px';
+  nd.style.transform = 'rotate(' + (state.az*180/Math.PI) + 'deg)';
+}
+function dialFromEvent(ev){
+  const r = dial.getBoundingClientRect();
+  const R = r.width/2;
+  const dx = ev.clientX - (r.left+R), dy = ev.clientY - (r.top+R);
+  const sunAz = Math.atan2(dy,dx);
+  state.az = sunAz + Math.PI;
+  const rad = Math.min(Math.hypot(dx,dy), R-8);
+  state.len = 0.1 + Math.max(0,(rad-14))/(R-26) * (2.5-0.1);
+  state.len = Math.min(Math.max(state.len, 0.1), 2.5);
+  dialLayout(); render();
+}
+let dialDrag = false;
+dial.addEventListener('pointerdown', ev=>{ dialDrag = true; state.fast = true; dial.setPointerCapture(ev.pointerId); dialFromEvent(ev); });
+dial.addEventListener('pointermove', ev=>{ if(dialDrag) dialFromEvent(ev); });
+dial.addEventListener('pointerup', ()=>{ dialDrag = false; state.fast = false; render(); });
+
+document.querySelectorAll('.preset').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    state.az = (+b.dataset.az)*Math.PI/180;
+    state.len = +b.dataset.len;
+    if(b.textContent.startsWith('Overcast')){ $('sBlur').value = 26; state.blur = 26; $('sBlurO').textContent = '26';
+      $('sOpacity').value = 0.32; state.opacity = 0.32; $('sOpacityO').textContent = '32%'; }
+    dialLayout(); render();
+  });
+});
+
+/* ---------- controls ---------- */
+function bindSlider(id, fn, fmt){
+  const el = $(id), out = $(id+'O');
+  el.addEventListener('input', ()=>{ fn(+el.value); if(out) out.innerHTML = fmt(+el.value); render(); });
+}
+bindSlider('cScale', v=>state.scale=v, v=>v.toFixed(2));
+bindSlider('cRot', v=>state.rot=v*Math.PI/180, v=>v.toFixed(0)+'&deg;');
+bindSlider('sOpacity', v=>state.opacity=v, v=>Math.round(v*100)+'%');
+bindSlider('sBlur', v=>state.blur=v, v=>v.toFixed(0));
+bindSlider('sFade', v=>state.fade=v, v=>Math.round(v*100)+'%');
+bindSlider('cStrength', v=>state.contactStrength=v, v=>Math.round(v*100)+'%');
+bindSlider('cSize', v=>state.contactSize=v, v=>v.toFixed(2));
+bindSlider('fClimb', v=>state.climb=v, v=>v.toFixed(2));
+
+$('anchorBtn').addEventListener('click', ()=>{
+  if(!state.cut){ toast('Load a cutout first'); return; }
+  state.settingAnchor = !state.settingAnchor;
+  $('anchorBtn').classList.toggle('on', state.settingAnchor);
+  stage.classList.toggle('setting', state.settingAnchor);
+});
+$('resetCut').addEventListener('click', ()=>{
+  state.pos = { x:stage.width/2, y:stage.height/2 }; render();
+});
+$('foldBtn').addEventListener('click', ()=>{
+  state.fold = !state.fold;
+  $('foldBtn').textContent = 'Fold: ' + (state.fold ? 'on' : 'off');
+  $('foldBtn').classList.toggle('on', state.fold);
+  $('foldControls').classList.toggle('show', state.fold);
+  render();
+});
+
+/* ---------- files ---------- */
+$('bgFile').addEventListener('change', ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  loadImage(f, img=>{
+    state.bg = img; fitCanvasToBg();
+    if(state.cut) state.pos = { x:stage.width/2, y:stage.height*0.6 };
+    $('dropHint').style.display = state.cut ? 'none' : '';
+    render();
+  });
+});
+$('cutFile').addEventListener('change', ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  loadImage(f, img=>{
+    state.cut = img; state.sil = makeSilhouette(img);
+    state.anchor = { x: img.naturalWidth/2, y: img.naturalHeight*0.97 };
+    if(!state.bg) fitCanvasToBg();
+    state.pos = { x:stage.width/2, y:stage.height*0.55 };
+    const fit = Math.min(stage.height*0.6/img.naturalHeight, stage.width*0.5/img.naturalWidth, 1);
+    state.scale = fit; $('cScale').value = fit; $('cScaleO').textContent = fit.toFixed(2);
+    $('dropHint').style.display = 'none';
+    render();
+  });
+});
+
+/* drag & drop */
+['dragover','drop'].forEach(t=>document.addEventListener(t, ev=>ev.preventDefault()));
+document.addEventListener('drop', ev=>{
+  const files = [...ev.dataTransfer.files].filter(f=>f.type.startsWith('image'));
+  if(!files.length) return;
+  for(const f of files){
+    if(!state.bg && files.length>1 && f !== files[files.length-1]){ loadImage(f, img=>{ state.bg=img; fitCanvasToBg(); render(); }); }
+    else if(!state.cut || files.length===1 && state.bg){
+      loadImage(f, img=>{ state.cut=img; state.sil=makeSilhouette(img);
+        state.anchor={x:img.naturalWidth/2,y:img.naturalHeight*0.97};
+        if(!state.bg) fitCanvasToBg();
+        state.pos={x:stage.width/2,y:stage.height*0.55};
+        $('dropHint').style.display='none'; render(); });
+    } else { loadImage(f, img=>{ state.bg=img; fitCanvasToBg(); render(); }); }
+  }
+});
+
+/* ---------- export ---------- */
+function download(canvas, name){
+  const a = document.createElement('a');
+  a.download = name; a.href = canvas.toDataURL('image/png'); a.click();
+}
+$('expShadow').addEventListener('click', ()=>{
+  if(!state.cut){ toast('Load a cutout first'); return; }
+  state.fast = false; buildShadowBuffer();
+  const c = document.createElement('canvas');
+  c.width = stage.width; c.height = stage.height;
+  const g = c.getContext('2d');
+  g.globalAlpha = state.opacity;
+  g.drawImage(bufS,0,0);
+  download(c, 'shadowforge-shadow.png');
+  toast('Shadow PNG saved');
+});
+$('expComp').addEventListener('click', ()=>{
+  if(!state.cut){ toast('Load a cutout first'); return; }
+  state.fast = false;
+  const c = document.createElement('canvas');
+  c.width = stage.width; c.height = stage.height;
+  renderScene(c.getContext('2d'), false);
+  download(c, 'shadowforge-composite.png');
+  toast('Composite PNG saved');
+});
+
+/* ---------- boot ---------- */
+dialLayout();
+render();
+window.addEventListener('resize', dialLayout);
+</script>
+</body>
+</html>

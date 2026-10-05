@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FPSForge</title>
+<style>
+  :root{
+    --bg:#13151a;
+    --panel:#1b1f27;
+    --panel2:#222732;
+    --line:#2e3542;
+    --ink:#e8eaee;
+    --dim:#8d95a4;
+    --amber:#f2b03c;
+    --good:#57c9a3;
+    --warn:#e8734a;
+    --sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    padding:28px 20px 80px;
+  }
+  .wrap{max-width:940px;margin:0 auto}
+
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+  h1{
+    font-size:26px;
+    font-weight:800;
+    letter-spacing:-0.4px;
+    margin:0;
+  }
+  header p{margin:0;color:var(--dim);font-size:14px}
+
+  /* drop target: clapper slate stripe along the top edge */
+  #drop{
+    position:relative;
+    border:1px solid var(--line);
+    background:var(--panel);
+    border-radius:4px;
+    padding:34px 24px 30px;
+    text-align:center;
+    cursor:pointer;
+    transition:background .12s linear, border-color .12s linear;
+  }
+  #drop::before{
+    content:"";
+    position:absolute;left:0;right:0;top:0;height:10px;
+    background:repeating-linear-gradient(115deg,#2e3542 0 16px,#13151a 16px 32px);
+    border-radius:4px 4px 0 0;
+  }
+  #drop:hover,#drop:focus-visible{background:var(--panel2);border-color:#3d465a;outline:none}
+  #drop.over{background:var(--panel2);border-color:var(--amber)}
+  #drop h2{margin:6px 0 6px;font-size:19px;font-weight:700}
+  #drop p{margin:0;color:var(--dim);font-size:13.5px}
+  input[type=file]{display:none}
+
+  .bar{display:flex;gap:10px;align-items:center;margin:22px 0 14px;min-height:30px}
+  .bar .count{color:var(--dim);font-size:13.5px;margin-right:auto}
+  button.act{
+    background:transparent;color:var(--ink);border:1px solid var(--line);
+    border-radius:3px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;
+  }
+  button.act:hover{border-color:#4a5468;background:var(--panel)}
+  button.act:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+  .slate{
+    display:grid;
+    grid-template-columns:190px 1fr;
+    gap:0;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--panel);
+    margin-bottom:12px;
+    overflow:hidden;
+  }
+  .readout{
+    background:var(--panel2);
+    border-right:1px solid var(--line);
+    padding:18px 16px;
+    display:flex;flex-direction:column;justify-content:center;
+  }
+  .fps{
+    font-size:44px;line-height:1;font-weight:800;letter-spacing:-1.5px;
+    font-variant-numeric:tabular-nums;color:var(--amber);
+  }
+  .fps.unknown{font-size:22px;color:var(--dim);font-weight:600;letter-spacing:0}
+  .fps.pending{font-size:22px;color:var(--dim);font-weight:600;letter-spacing:0}
+  .ratio{color:var(--dim);font-size:13px;font-variant-numeric:tabular-nums;margin-top:6px}
+  .unit{color:var(--dim);font-size:12.5px;margin-top:2px}
+
+  .body{padding:16px 18px}
+  .fname{font-weight:600;word-break:break-all;margin-bottom:3px}
+  .fsub{color:var(--dim);font-size:13px;margin-bottom:12px}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px 16px}
+  .meta div span{display:block;color:var(--dim);font-size:11.5px}
+  .meta div strong{font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+
+  .tags{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .tag{font-size:11.5px;padding:2px 8px;border-radius:2px;border:1px solid var(--line);color:var(--dim)}
+  .tag.cfr{color:var(--good);border-color:#2f5f52}
+  .tag.vfr{color:var(--warn);border-color:#6b3b2c}
+  .tag.exact{color:var(--ink);border-color:#4a5468}
+
+  .note{color:var(--warn);font-size:13px;margin-top:10px}
+  footer{color:var(--dim);font-size:12.5px;margin-top:26px;line-height:1.7}
+  @media (max-width:640px){
+    .slate{grid-template-columns:1fr}
+    .readout{border-right:none;border-bottom:1px solid var(--line)}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>FPSForge</h1>
+    <p>Frame rate of any video file, read on your machine</p>
+  </header>
+
+  <div id="drop" tabindex="0" role="button" aria-label="Choose video files">
+    <h2>Drop video files here</h2>
+    <p>Or click to pick them. Folders work too. Nothing uploads, nothing leaves this page.</p>
+  </div>
+  <input type="file" id="picker" multiple accept="video/*,.mp4,.mov,.m4v,.mkv,.webm,.avi,.mts,.m2ts,.ts,.mpg,.mpeg,.wmv,.flv,.3gp,.ogv">
+
+  <div class="bar" id="bar" hidden>
+    <span class="count" id="count"></span>
+    <button class="act" id="copy">Copy list</button>
+    <button class="act" id="csv">Save CSV</button>
+    <button class="act" id="clear">Clear</button>
+  </div>
+
+  <div id="results"></div>
+
+  <footer>
+    Container-read values come straight from the file's own timing table, so they are exact.
+    If a file has no readable table, FPSForge plays a second of it and counts real frames instead, which lands within a hair of the true rate.
+    Variable frame rate footage gets flagged, since that is the stuff that drifts out of sync once you cut it.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+const VIDEO_EXT = ["mp4","mov","m4v","mkv","webm","avi","mts","m2ts","ts","mpg","mpeg","mpe","wmv","flv","3gp","3g2","ogv","asf","vob","divx","f4v","m2v","mxf"];
+const STANDARD = [
+  {v:8,l:"8"},{v:10,l:"10"},{v:12,l:"12"},{v:12.5,l:"12.5"},{v:15,l:"15"},{v:16,l:"16"},{v:18,l:"18"},{v:20,l:"20"},
+  {v:24000/1001,l:"23.976"},{v:24,l:"24"},{v:25,l:"25"},
+  {v:30000/1001,l:"29.97"},{v:30,l:"30"},{v:48,l:"48"},{v:50,l:"50"},
+  {v:60000/1001,l:"59.94"},{v:60,l:"60"},{v:72,l:"72"},{v:90,l:"90"},{v:100,l:"100"},
+  {v:120000/1001,l:"119.88"},{v:120,l:"120"},{v:144,l:"144"},{v:240,l:"240"}
+];
+
+const FOURCC = {
+  avc1:"H.264", avc3:"H.264", hvc1:"HEVC", hev1:"HEVC", dvh1:"HEVC (Dolby Vision)", dvhe:"HEVC (Dolby Vision)",
+  av01:"AV1", vp09:"VP9", vp08:"VP8", mp4v:"MPEG-4", s263:"H.263", cvid:"Cinepak", jpeg:"Motion JPEG", mjpa:"Motion JPEG",
+  ap4h:"ProRes 4444", ap4x:"ProRes 4444 XQ", apch:"ProRes 422 HQ", apcn:"ProRes 422", apcs:"ProRes 422 LT", apco:"ProRes 422 Proxy",
+  dvc:"DV", dvcp:"DV", hdv1:"HDV", hdv2:"HDV", "2vuy":"Uncompressed 4:2:2", v210:"Uncompressed 10-bit"
+};
+const MKV_CODEC = {
+  "V_MPEG4/ISO/AVC":"H.264", "V_MPEGH/ISO/HEVC":"HEVC", "V_VP8":"VP8", "V_VP9":"VP9", "V_AV1":"AV1",
+  "V_MPEG4/ISO/ASP":"MPEG-4", "V_MPEG2":"MPEG-2", "V_MS/VFW/FOURCC":"VFW"
+};
+
+const results = [];
+const resultsEl = document.getElementById("results");
+const barEl = document.getElementById("bar");
+const countEl = document.getElementById("count");
+const drop = document.getElementById("drop");
+const picker = document.getElementById("picker");
+
+/* ---------- helpers ---------- */
+
+function gcd(a,b){ while(b){ [a,b]=[b,a%b]; } return a; }
+function ext(name){ const i = name.lastIndexOf("."); return i<0 ? "" : name.slice(i+1).toLowerCase(); }
+function looksLikeVideo(file){ return file.type.startsWith("video/") || VIDEO_EXT.includes(ext(file.name)); }
+
+function fmtSize(b){
+  if(b > 1073741824) return (b/1073741824).toFixed(2)+" GB";
+  if(b > 1048576) return (b/1048576).toFixed(1)+" MB";
+  return Math.max(1, Math.round(b/1024))+" KB";
+}
+function fmtDur(s){
+  if(!isFinite(s) || s<=0) return "\u2014";
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+  const ss = (sec<10?"0":"")+sec.toFixed(2);
+  return h ? `${h}:${String(m).padStart(2,"0")}:${ss}` : `${m}:${ss}`;
+}
+function fmtFps(f, tol){
+  const s = snap(f, tol);
+  if(s) return s.l;
+  return f.toFixed(3).replace(/0+$/,"").replace(/\.$/,"");
+}
+function snap(f, tol){
+  // 23.976 and 24 sit 0.1% apart, so take the nearest rate and keep the window tight
+  let best = null, bestErr = Infinity;
+  for(const s of STANDARD){
+    const err = Math.abs(f - s.v) / s.v;
+    if(err < bestErr){ bestErr = err; best = s; }
+  }
+  return bestErr <= (tol === undefined ? 0.0004 : tol) ? best : null;
+}
+// a value read from the timing table is exact, a value counted during playback is not
+function tolFor(r){ return (r.source === "container" && !r.loose) ? 0.0004 : 0.004; }
+async function bytes(file, start, end){
+  return new Uint8Array(await file.slice(start, Math.min(end, file.size)).arrayBuffer());
+}
+function fourcc(buf, pos){
+  return String.fromCharCode(buf[pos],buf[pos+1],buf[pos+2],buf[pos+3]);
+}
+
+/* ---------- MP4 / MOV ---------- */
+
+async function findMoov(file){
+  let pos = 0;
+  let guard = 0;
+  while(pos + 8 <= file.size && guard++ < 4000){
+    const head = await bytes(file, pos, pos+16);
+    if(head.length < 8) return null;
+    const dv = new DataView(head.buffer, head.byteOffset, head.byteLength);
+    let size = dv.getUint32(0);
+    const type = fourcc(head, 4);
+    let hs = 8;
+    if(size === 1){
+      if(head.length < 16) return null;
+      size = Number(dv.getBigUint64(8));
+      hs = 16;
+    } else if(size === 0){
+      size = file.size - pos;
+    }
+    if(pos === 0 && !["ftyp","moov","mdat","free","skip","wide","pnot","styp","junk"].includes(type)) return null;
+    if(size < hs) return null;
+    if(type === "moov"){
+      if(size - hs > 200*1024*1024) return null;
+      return await bytes(file, pos+hs, pos+size);
+    }
+    pos += size;
+  }
+  return null;
+}
+
+function* children(buf, start, end){
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let pos = start;
+  while(pos + 8 <= end){
+    let size = dv.getUint32(pos);
+    const type = fourcc(buf, pos+4);
+    let hs = 8;
+    if(size === 1){
+      if(pos+16 > end) return;
+      size = Number(dv.getBigUint64(pos+8));
+      hs = 16;
+    } else if(size === 0){
+      size = end - pos;
+    }
+    if(size < hs || pos + size > end) return;
+    yield {type, start: pos+hs, end: pos+size};
+    pos += size;
+  }
+}
+function findBox(buf, start, end, path){
+  let s = start, e = end;
+  for(const want of path){
+    let hit = null;
+    for(const box of children(buf, s, e)){ if(box.type === want){ hit = box; break; } }
+    if(!hit) return null;
+    s = hit.start; e = hit.end;
+  }
+  return {start:s, end:e};
+}
+
+function parseMoov(buf){
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  for(const trak of children(buf, 0, buf.length)){
+    if(trak.type !== "trak") continue;
+    const hdlr = findBox(buf, trak.start, trak.end, ["mdia","hdlr"]);
+    if(!hdlr || fourcc(buf, hdlr.start + 8) !== "vide") continue;
+
+    const mdhd = findBox(buf, trak.start, trak.end, ["mdia","mdhd"]);
+    if(!mdhd) continue;
+    const ver = buf[mdhd.start];
+    let timescale, mediaDur;
+    if(ver === 1){
+      timescale = dv.getUint32(mdhd.start + 20);
+      mediaDur = Number(dv.getBigUint64(mdhd.start + 24));
+    } else {
+      timescale = dv.getUint32(mdhd.start + 12);
+      mediaDur = dv.getUint32(mdhd.start + 16);
+    }
+    if(!timescale) continue;
+
+    const stts = findBox(buf, trak.start, trak.end, ["mdia","minf","stbl","stts"]);
+    if(!stts) continue;
+    const entries = dv.getUint32(stts.start + 4);
+    let frames = 0, ticks = 0;
+    const tally = new Map();
+    for(let i=0;i<entries;i++){
+      const off = stts.start + 8 + i*8;
+      if(off + 8 > stts.end) break;
+      const count = dv.getUint32(off);
+      const delta = dv.getUint32(off + 4);
+      if(!delta) continue;
+      frames += count;
+      ticks += count * delta;
+      tally.set(delta, (tally.get(delta) || 0) + count);
+    }
+    if(!frames || !ticks) continue;
+
+    // dominant sample delta
+    let mode = 0, modeCount = 0;
+    for(const [d,c] of tally){ if(c > modeCount){ mode = d; modeCount = c; } }
+    let offbeat = 0;
+    for(const [d,c] of tally){ if(Math.abs(d-mode)/mode > 0.01) offbeat += c; }
+    const vfr = frames > 8 && offbeat / frames > 0.02;
+
+    const avgFps = timescale * frames / ticks;
+    const modeFps = timescale / mode;
+    const fps = vfr ? avgFps : modeFps;
+
+    let ratio = null;
+    if(!vfr){
+      const g = gcd(timescale, mode);
+      const n = timescale/g, d = mode/g;
+      if(d !== 1 && n < 1e7) ratio = n + "/" + d;
+    }
+
+    // dimensions from tkhd
+    let w = 0, h = 0;
+    const tkhd = findBox(buf, trak.start, trak.end, ["tkhd"]);
+    if(tkhd){
+      const tv = buf[tkhd.start];
+      const base = tkhd.start + (tv === 1 ? 88 : 76);
+      if(base + 8 <= tkhd.end){
+        w = Math.round(dv.getUint32(base) / 65536);
+        h = Math.round(dv.getUint32(base + 4) / 65536);
+      }
+    }
+    let codec = "";
+    const stsd = findBox(buf, trak.start, trak.end, ["mdia","minf","stbl","stsd"]);
+    if(stsd && stsd.start + 16 <= stsd.end){
+      const cc = fourcc(buf, stsd.start + 12);
+      codec = FOURCC[cc] || cc;
+      if(!w || !h){
+        w = dv.getUint16(stsd.start + 12 + 24);
+        h = dv.getUint16(stsd.start + 12 + 26);
+      }
+    }
+
+    return {
+      fps, ratio, vfr, frames, codec,
+      duration: mediaDur ? mediaDur/timescale : ticks/timescale,
+      width:w, height:h, source:"container"
+    };
+  }
+  return null;
+}
+
+/* ---------- Matroska / WebM ---------- */
+
+function readVint(buf, pos, keepMarker){
+  if(pos >= buf.length) return null;
+  const first = buf[pos];
+  if(first === 0) return null;
+  let len = 1, mask = 0x80;
+  while(!(first & mask)){ mask >>= 1; len++; if(len > 8) return null; }
+  if(pos + len > buf.length) return null;
+  let value = keepMarker ? first : (first & (mask - 1));
+  let allOnes = !keepMarker && (first & (mask-1)) === (mask-1);
+  for(let i=1;i<len;i++){
+    value = value * 256 + buf[pos+i];
+    if(buf[pos+i] !== 0xff) allOnes = false;
+  }
+  return {value, len, unknown: allOnes};
+}
+function uintFrom(buf, pos, len){
+  let v = 0;
+  for(let i=0;i<len;i++) v = v*256 + buf[pos+i];
+  return v;
+}
+function walkEbml(buf, start, end, visit){
+  let pos = start;
+  while(pos < end){
+    const id = readVint(buf, pos, true);
+    if(!id) return;
+    const sz = readVint(buf, pos + id.len, false);
+    if(!sz) return;
+    const dataStart = pos + id.len + sz.len;
+    let dataEnd = sz.unknown ? end : dataStart + sz.value;
+    if(dataEnd > end) dataEnd = end;
+    if(dataStart > end) return;
+    visit(id.value, dataStart, dataEnd);
+    pos = dataEnd;
+    if(dataEnd <= dataStart && !sz.unknown) return;
+  }
+}
+async function parseMatroska(file){
+  const buf = await bytes(file, 0, Math.min(file.size, 6*1024*1024));
+  if(!(buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3)) return null;
+  let out = null;
+  let scale = 1000000, segDur = 0;
+
+  walkEbml(buf, 0, buf.length, (id, s, e) => {
+    if(id !== 0x18538067) return;                       // Segment
+    walkEbml(buf, s, e, (id2, s2, e2) => {
+      if(id2 === 0x1549A966){                           // Info
+        walkEbml(buf, s2, e2, (id3, s3, e3) => {
+          if(id3 === 0x2AD7B1) scale = uintFrom(buf, s3, e3-s3);
+          if(id3 === 0x4489){
+            const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+            segDur = (e3-s3) === 4 ? dv.getFloat32(s3) : (e3-s3) === 8 ? dv.getFloat64(s3) : 0;
+          }
+        });
+      }
+      if(id2 !== 0x1654AE6B) return;                    // Tracks
+      walkEbml(buf, s2, e2, (id3, s3, e3) => {
+        if(id3 !== 0xAE) return;                        // TrackEntry
+        let type = 0, defDur = 0, w = 0, h = 0, codec = "";
+        walkEbml(buf, s3, e3, (id4, s4, e4) => {
+          const len = e4 - s4;
+          if(id4 === 0x83) type = uintFrom(buf, s4, len);
+          else if(id4 === 0x23E383) defDur = uintFrom(buf, s4, len);
+          else if(id4 === 0xB0) w = uintFrom(buf, s4, len);
+          else if(id4 === 0xBA) h = uintFrom(buf, s4, len);
+          else if(id4 === 0x86) codec = new TextDecoder().decode(buf.subarray(s4, e4)).replace(/\0+$/,"");
+          else if(id4 === 0xE0) walkEbml(buf, s4, e4, (id5, s5, e5) => {   // Video
+            if(id5 === 0xB0) w = uintFrom(buf, s5, e5-s5);
+            if(id5 === 0xBA) h = uintFrom(buf, s5, e5-s5);
+          });
+        });
+        if(type === 1 && defDur > 0 && !out){
+          const fps = 1e9 / defDur;
+          const dur = segDur ? segDur * scale / 1e9 : 0;
+          out = {
+            fps, ratio:null, vfr:false, frames: dur ? Math.round(dur*fps) : 0,
+            codec: MKV_CODEC[codec] || codec, duration: dur, width:w, height:h,
+            source:"container", loose:true
+          };
+        }
+      });
+    });
+  });
+  return out;
+}
+
+/* ---------- AVI ---------- */
+
+async function parseAvi(file){
+  const buf = await bytes(file, 0, Math.min(file.size, 262144));
+  if(fourcc(buf,0) !== "RIFF" || fourcc(buf,8) !== "AVI ") return null;
+  for(let i=12;i<buf.length-56;i++){
+    if(buf[i]===0x61 && buf[i+1]===0x76 && buf[i+2]===0x69 && buf[i+3]===0x68){ // avih
+      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      const d = i + 8;
+      const micro = dv.getUint32(d, true);
+      if(!micro) return null;
+      const fps = 1e6 / micro;
+      const frames = dv.getUint32(d + 16, true);
+      return {
+        fps, ratio:null, vfr:false, frames,
+        codec:"", duration: frames ? frames/fps : 0,
+        width: dv.getUint32(d + 32, true), height: dv.getUint32(d + 36, true),
+        source:"container"
+      };
+    }
+  }
+  return null;
+}
+
+/* ---------- playback fallback ---------- */
+
+function measureByPlayback(file){
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+    let done = false;
+    const finish = (res) => {
+      if(done) return;
+      done = true;
+      try{ v.pause(); }catch(e){}
+      v.removeAttribute("src"); v.load();
+      URL.revokeObjectURL(url);
+      resolve(res);
+    };
+    const bail = setTimeout(() => finish(null), 12000);
+
+    v.onerror = () => { clearTimeout(bail); finish(null); };
+    v.onloadedmetadata = () => {
+      if(typeof v.requestVideoFrameCallback !== "function"){ clearTimeout(bail); finish(null); }
+    };
+
+    const samples = [];
+    const tick = (now, meta) => {
+      samples.push({t: meta.mediaTime, n: meta.presentedFrames});
+      if(samples.length >= 45 || (samples.length > 12 && samples[samples.length-1].t - samples[0].t > 1.2)){
+        clearTimeout(bail);
+        const a = samples[1] || samples[0], b = samples[samples.length-1];
+        const dt = b.t - a.t, dn = b.n - a.n;
+        let fps = (dt > 0 && dn > 0) ? dn/dt : 0;
+
+        const deltas = [];
+        for(let i=2;i<samples.length;i++){
+          const d = samples[i].t - samples[i-1].t;
+          if(d > 0) deltas.push(d);
+        }
+        deltas.sort((x,y)=>x-y);
+        const med = deltas.length ? deltas[Math.floor(deltas.length/2)] : 0;
+        let vfr = false;
+        if(deltas.length > 8 && med > 0){
+          const off = deltas.filter(d => Math.abs(d-med)/med > 0.25).length;
+          vfr = off / deltas.length > 0.1;
+        }
+        if(!fps && med) fps = 1/med;
+        if(!fps) return finish(null);
+
+        finish({
+          fps, ratio:null, vfr, frames: v.duration ? Math.round(v.duration*fps) : 0,
+          codec:"", duration: v.duration || 0,
+          width: v.videoWidth, height: v.videoHeight,
+          source:"playback"
+        });
+        return;
+      }
+      v.requestVideoFrameCallback(tick);
+    };
+
+    v.oncanplay = () => {
+      if(typeof v.requestVideoFrameCallback !== "function") return;
+      v.requestVideoFrameCallback(tick);
+      v.play().catch(() => { clearTimeout(bail); finish(null); });
+    };
+  });
+}
+
+/* ---------- pipeline ---------- */
+
+async function inspect(file){
+  const e = ext(file.name);
+  try{
+    if(["mp4","mov","m4v","3gp","3g2","f4v","mxf"].includes(e) || !e || file.type === "video/mp4" || file.type === "video/quicktime"){
+      const moov = await findMoov(file);
+      if(moov){
+        const r = parseMoov(moov);
+        if(r) return r;
+      }
+    } else {
+      const moov = await findMoov(file);
+      if(moov){
+        const r = parseMoov(moov);
+        if(r) return r;
+      }
+    }
+  }catch(err){}
+  try{ const r = await parseMatroska(file); if(r) return r; }catch(err){}
+  try{ const r = await parseAvi(file); if(r) return r; }catch(err){}
+  return await measureByPlayback(file);
+}
+
+/* ---------- rendering ---------- */
+
+function render(){
+  resultsEl.innerHTML = "";
+  for(const r of results) resultsEl.appendChild(card(r));
+  barEl.hidden = results.length === 0;
+  const done = results.filter(r => r.state !== "working").length;
+  countEl.textContent = results.length === 1
+    ? "1 file"
+    : `${results.length} files, ${done} read`;
+}
+
+function card(r){
+  const el = document.createElement("div");
+  el.className = "slate";
+
+  const left = document.createElement("div");
+  left.className = "readout";
+  const big = document.createElement("div");
+  if(r.state === "working"){
+    big.className = "fps pending";
+    big.textContent = "reading";
+  } else if(r.state === "failed"){
+    big.className = "fps unknown";
+    big.textContent = "no reading";
+  } else {
+    big.className = "fps";
+    big.textContent = fmtFps(r.fps, tolFor(r));
+  }
+  left.appendChild(big);
+  if(r.state === "ok"){
+    const unit = document.createElement("div");
+    unit.className = "unit";
+    unit.textContent = "frames per second";
+    left.appendChild(unit);
+    if(r.ratio){
+      const ratio = document.createElement("div");
+      ratio.className = "ratio";
+      ratio.textContent = r.ratio + " exactly";
+      left.appendChild(ratio);
+    } else if(r.source === "container" && !r.loose){
+      const ratio = document.createElement("div");
+      ratio.className = "ratio";
+      ratio.textContent = "whole number, no pulldown";
+      left.appendChild(ratio);
+    } else if(r.source === "playback"){
+      const ratio = document.createElement("div");
+      ratio.className = "ratio";
+      ratio.textContent = "measured " + r.fps.toFixed(3);
+      left.appendChild(ratio);
+    }
+  }
+
+  const body = document.createElement("div");
+  body.className = "body";
+  const name = document.createElement("div");
+  name.className = "fname";
+  name.textContent = r.name;
+  const sub = document.createElement("div");
+  sub.className = "fsub";
+  sub.textContent = fmtSize(r.size);
+  body.appendChild(name); body.appendChild(sub);
+
+  if(r.state === "ok"){
+    const tags = document.createElement("div");
+    tags.className = "tags";
+    const t1 = document.createElement("span");
+    t1.className = "tag " + (r.vfr ? "vfr" : "cfr");
+    t1.textContent = r.vfr ? "variable frame rate" : "constant frame rate";
+    tags.appendChild(t1);
+    const t2 = document.createElement("span");
+    t2.className = "tag" + (r.source === "container" && !r.loose ? " exact" : "");
+    t2.textContent = r.source === "container" ? (r.loose ? "read from header" : "read from timing table") : "counted during playback";
+    tags.appendChild(t2);
+    body.appendChild(tags);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const rows = [
+      ["Duration", fmtDur(r.duration)],
+      ["Frames", r.frames ? r.frames.toLocaleString() : "\u2014"],
+      ["Resolution", (r.width && r.height) ? `${r.width} \u00d7 ${r.height}` : "\u2014"],
+      ["Codec", r.codec || "\u2014"]
+    ];
+    for(const [k,val] of rows){
+      const d = document.createElement("div");
+      const s = document.createElement("span"); s.textContent = k;
+      const b = document.createElement("strong"); b.textContent = val;
+      d.appendChild(s); d.appendChild(b); meta.appendChild(d);
+    }
+    body.appendChild(meta);
+
+    if(r.vfr){
+      const note = document.createElement("div");
+      note.className = "note";
+      note.textContent = "Frame timing drifts in this file. Transcode it to a constant rate before cutting or the audio will slide out of sync.";
+      body.appendChild(note);
+    }
+  } else if(r.state === "failed"){
+    const note = document.createElement("div");
+    note.className = "note";
+    note.textContent = "No timing table in the header and the browser cannot decode this format. Rewrap it to MP4 or MKV and drop it again.";
+    body.appendChild(note);
+  }
+
+  el.appendChild(left); el.appendChild(body);
+  return el;
+}
+
+/* ---------- intake ---------- */
+
+let queue = Promise.resolve();
+
+function addFiles(files){
+  const list = Array.from(files).filter(looksLikeVideo);
+  if(!list.length) return;
+  for(const file of list){
+    const rec = {name:file.name, size:file.size, state:"working"};
+    results.push(rec);
+    queue = queue.then(async () => {
+      const data = await inspect(file);
+      if(data && isFinite(data.fps) && data.fps > 0.2 && data.fps < 1200){
+        Object.assign(rec, data, {state:"ok"});
+      } else {
+        rec.state = "failed";
+      }
+      render();
+    });
+  }
+  render();
+}
+
+async function fromEntry(entry, out){
+  if(entry.isFile){
+    await new Promise(res => entry.file(f => { out.push(f); res(); }, res));
+  } else if(entry.isDirectory){
+    const reader = entry.createReader();
+    while(true){
+      const batch = await new Promise(res => reader.readEntries(res, () => res([])));
+      if(!batch.length) break;
+      for(const child of batch) await fromEntry(child, out);
+    }
+  }
+}
+
+drop.addEventListener("click", () => picker.click());
+drop.addEventListener("keydown", e => {
+  if(e.key === "Enter" || e.key === " "){ e.preventDefault(); picker.click(); }
+});
+picker.addEventListener("change", () => { addFiles(picker.files); picker.value = ""; });
+
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("over");
+}));
+drop.addEventListener("drop", async e => {
+  const items = e.dataTransfer.items;
+  if(items && items.length && items[0].webkitGetAsEntry){
+    const entries = [];
+    for(const item of items){
+      const entry = item.webkitGetAsEntry();
+      if(entry) entries.push(entry);
+    }
+    const out = [];
+    for(const entry of entries) await fromEntry(entry, out);
+    addFiles(out);
+  } else {
+    addFiles(e.dataTransfer.files);
+  }
+});
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+
+/* ---------- output ---------- */
+
+function tableRows(){
+  return results.filter(r => r.state === "ok").map(r => [
+    r.name,
+    fmtFps(r.fps, tolFor(r)),
+    r.ratio || "",
+    r.vfr ? "VFR" : "CFR",
+    fmtDur(r.duration),
+    r.frames || "",
+    (r.width && r.height) ? `${r.width}x${r.height}` : "",
+    r.codec || ""
+  ]);
+}
+document.getElementById("copy").addEventListener("click", async e => {
+  const text = tableRows().map(row => row.join("\t")).join("\n");
+  try{
+    await navigator.clipboard.writeText(text);
+    e.target.textContent = "Copied";
+    setTimeout(() => e.target.textContent = "Copy list", 1200);
+  }catch(err){
+    e.target.textContent = "Clipboard blocked";
+    setTimeout(() => e.target.textContent = "Copy list", 1600);
+  }
+});
+document.getElementById("csv").addEventListener("click", () => {
+  const head = ["file","fps","exact","timing","duration","frames","resolution","codec"];
+  const esc = v => `"${String(v).replace(/"/g,'""')}"`;
+  const csv = [head, ...tableRows()].map(row => row.map(esc).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"}));
+  a.download = "frame-rates.csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
+document.getElementById("clear").addEventListener("click", () => {
+  results.length = 0;
+  render();
+});
+</script>
+</body>
+</html>
